@@ -2,8 +2,8 @@ use crate::token::{look_up_ident, Token, TokenType};
 use std::char;
 
 #[derive(Debug)]
-pub struct Lexer {
-    input: &'static str,
+pub struct Lexer<'a> {
+    input: &'a str,
     // points to the char in the input that corresponds to the ch
     position: usize,
     // points to the next char in the input
@@ -12,8 +12,8 @@ pub struct Lexer {
     ch: u8,
 }
 
-impl Lexer {
-    fn new(input: &'static str) -> Self {
+impl<'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Self {
         let mut lexer = Lexer {
             input,
             position: 0,
@@ -29,14 +29,25 @@ impl Lexer {
         self.read_char();
     }
 
-    fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Token {
         self.skip_white_space();
 
         let tok = match self.ch as char {
-            '=' => Token {
-                literal: "=",
-                r#type: TokenType::ASSIGN,
-            },
+            '=' => {
+                if self.peek_char() == b'=' {
+                    self.read_char();
+
+                    Token {
+                        literal: "==",
+                        r#type: TokenType::EQ,
+                    }
+                } else {
+                    Token {
+                        literal: "=",
+                        r#type: TokenType::ASSIGN,
+                    }
+                }
+            }
             ';' => Token {
                 literal: ";",
                 r#type: TokenType::SEMICOLON,
@@ -64,6 +75,41 @@ impl Lexer {
             '+' => Token {
                 literal: "+",
                 r#type: TokenType::PLUS,
+            },
+            '-' => Token {
+                literal: "-",
+                r#type: TokenType::MINUS,
+            },
+            '!' => {
+                if self.peek_char() == b'=' {
+                    self.read_char();
+
+                    Token {
+                        literal: "!=",
+                        r#type: TokenType::NOT_EQ,
+                    }
+                } else {
+                    Token {
+                        literal: "!",
+                        r#type: TokenType::BANG,
+                    }
+                }
+            }
+            '*' => Token {
+                literal: "*",
+                r#type: TokenType::ASTERISK,
+            },
+            '/' => Token {
+                literal: "/",
+                r#type: TokenType::SLASH,
+            },
+            '>' => Token {
+                literal: ">",
+                r#type: TokenType::GT,
+            },
+            '<' => Token {
+                literal: "<",
+                r#type: TokenType::LT,
             },
             '\0' => Token {
                 literal: "\0",
@@ -96,7 +142,7 @@ impl Lexer {
         tok
     }
 
-    fn read_number(&mut self) -> &'static str {
+    fn read_number(&mut self) -> &'a str {
         let position = self.position;
         while is_digit(self.ch as char) {
             self.read_char();
@@ -111,13 +157,21 @@ impl Lexer {
         }
     }
 
-    fn read_identifier(&mut self) -> &'static str {
+    fn read_identifier(&mut self) -> &'a str {
         let position = self.position;
         while is_letter(self.ch as char) {
             self.read_char();
         }
 
         &self.input[position..self.position]
+    }
+
+    fn peek_char(&self) -> u8 {
+        if self.read_position >= self.input.len() {
+            0
+        } else {
+            *self.input.as_bytes().get(self.read_position).unwrap()
+        }
     }
 
     fn read_char(&mut self) {
@@ -222,9 +276,20 @@ mod tests {
                 x + y;
             };
 
-            let result = add(five, ten);"#;
+            let result = add(five, ten);
+            !-/*5;
+            5 < 10 > 5;
 
-        const EXPECTED: [TestToken; 36] = [
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }
+
+            10 == 10;
+            10 != 9;"#;
+
+        const EXPECTED: [TestToken; 74] = [
             TestToken {
                 expected_type: TokenType::LET,
                 expected_literal: "let",
@@ -368,6 +433,158 @@ mod tests {
             TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::BANG,
+                expected_literal: "!",
+            },
+            TestToken {
+                expected_type: TokenType::MINUS,
+                expected_literal: "-",
+            },
+            TestToken {
+                expected_type: TokenType::SLASH,
+                expected_literal: "/",
+            },
+            TestToken {
+                expected_type: TokenType::ASTERISK,
+                expected_literal: "*",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "5",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "5",
+            },
+            TestToken {
+                expected_type: TokenType::LT,
+                expected_literal: "<",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "10",
+            },
+            TestToken {
+                expected_type: TokenType::GT,
+                expected_literal: ">",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "5",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::IF,
+                expected_literal: "if",
+            },
+            TestToken {
+                expected_type: TokenType::LPAREN,
+                expected_literal: "(",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "5",
+            },
+            TestToken {
+                expected_type: TokenType::LT,
+                expected_literal: "<",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "10",
+            },
+            TestToken {
+                expected_type: TokenType::RPAREN,
+                expected_literal: ")",
+            },
+            TestToken {
+                expected_type: TokenType::LBRACE,
+                expected_literal: "{",
+            },
+            TestToken {
+                expected_type: TokenType::RETURN,
+                expected_literal: "return",
+            },
+            TestToken {
+                expected_type: TokenType::TRUE,
+                expected_literal: "true",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::RBRACE,
+                expected_literal: "}",
+            },
+            TestToken {
+                expected_type: TokenType::ELSE,
+                expected_literal: "else",
+            },
+            TestToken {
+                expected_type: TokenType::LBRACE,
+                expected_literal: "{",
+            },
+            TestToken {
+                expected_type: TokenType::RETURN,
+                expected_literal: "return",
+            },
+            TestToken {
+                expected_type: TokenType::FALSE,
+                expected_literal: "false",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::RBRACE,
+                expected_literal: "}",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "10",
+            },
+            TestToken {
+                expected_type: TokenType::EQ,
+                expected_literal: "==",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "10",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "10",
+            },
+            TestToken {
+                expected_type: TokenType::NOT_EQ,
+                expected_literal: "!=",
+            },
+            TestToken {
+                expected_type: TokenType::INT,
+                expected_literal: "9",
+            },
+            TestToken {
+                expected_type: TokenType::SEMICOLON,
+                expected_literal: ";",
+            },
+            TestToken {
+                expected_type: TokenType::EOF,
+                expected_literal: "\0",
             },
         ];
         let mut lexer = Lexer::new(input);
