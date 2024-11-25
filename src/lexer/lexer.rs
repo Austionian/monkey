@@ -145,7 +145,7 @@ mod tests {
     use crate::token::TokenType;
 
     #[derive(Debug)]
-    struct TestTokens {
+    struct TestToken {
         expected_type: TokenType,
         expected_literal: &'static str,
     }
@@ -154,40 +154,40 @@ mod tests {
     fn test_next_token() {
         let input = "=+(){},;";
 
-        const EXPECTED: [TestTokens; 9] = [
-            TestTokens {
+        const EXPECTED: [TestToken; 9] = [
+            TestToken {
                 expected_type: TokenType::ASSIGN,
                 expected_literal: "=",
             },
-            TestTokens {
+            TestToken {
                 expected_literal: "+",
                 expected_type: TokenType::PLUS,
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LPAREN,
                 expected_literal: "(",
             },
-            TestTokens {
+            TestToken {
                 expected_literal: ")",
                 expected_type: TokenType::RPAREN,
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LBRACE,
                 expected_literal: "{",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::RBRACE,
                 expected_literal: "}",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::COMMA,
                 expected_literal: ",",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
-            TestTokens {
+            TestToken {
                 expected_literal: "\0",
                 expected_type: TokenType::EOF,
             },
@@ -224,148 +224,148 @@ mod tests {
 
             let result = add(five, ten);"#;
 
-        const EXPECTED: [TestTokens; 36] = [
-            TestTokens {
+        const EXPECTED: [TestToken; 36] = [
+            TestToken {
                 expected_type: TokenType::LET,
                 expected_literal: "let",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "five",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::ASSIGN,
                 expected_literal: "=",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::INT,
                 expected_literal: "5",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LET,
                 expected_literal: "let",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "ten",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::ASSIGN,
                 expected_literal: "=",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::INT,
                 expected_literal: "10",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LET,
                 expected_literal: "let",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "add",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::ASSIGN,
                 expected_literal: "=",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::FUNCTION,
                 expected_literal: "fn",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LPAREN,
                 expected_literal: "(",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "x",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::COMMA,
                 expected_literal: ",",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "y",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::RPAREN,
                 expected_literal: ")",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LBRACE,
                 expected_literal: "{",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "x",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::PLUS,
                 expected_literal: "+",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "y",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::RBRACE,
                 expected_literal: "}",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LET,
                 expected_literal: "let",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "result",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::ASSIGN,
                 expected_literal: "=",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "add",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::LPAREN,
                 expected_literal: "(",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "five",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::COMMA,
                 expected_literal: ",",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::IDENT,
                 expected_literal: "ten",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::RPAREN,
                 expected_literal: ")",
             },
-            TestTokens {
+            TestToken {
                 expected_type: TokenType::SEMICOLON,
                 expected_literal: ";",
             },
