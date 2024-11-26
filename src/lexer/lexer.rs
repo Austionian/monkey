@@ -132,7 +132,7 @@ impl<'a> Lexer<'a> {
                 Token {
                     // TODO: clean up this leak. Program probably ends at this point so maybe
                     // leaking memory isn't the worst thing to do here.
-                    literal: Box::leak(Box::new(String::from_utf8(vec![ch as u8]).unwrap())),
+                    literal: &self.input[self.position..self.position + 1],
                     r#type: TokenType::ILLEGAL,
                 }
             }

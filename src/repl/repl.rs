@@ -2,7 +2,10 @@ use crate::{
     lexer,
     token::{Token, TokenType},
 };
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    process,
+};
 
 const PROMPT: &'static str = ">> ";
 
@@ -12,6 +15,10 @@ pub fn start() {
 
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
+
+    if buffer.trim() == "/bye" || buffer.trim() == "exit" {
+        process::exit(0)
+    }
 
     let mut lexer = lexer::Lexer::new(&buffer);
 
