@@ -38,46 +38,46 @@ impl<'a> Lexer<'a> {
                     self.read_char();
 
                     Token {
-                        literal: "==",
+                        literal: "==".to_string(),
                         r#type: TokenType::EQ,
                     }
                 } else {
                     Token {
-                        literal: "=",
+                        literal: "=".to_string(),
                         r#type: TokenType::ASSIGN,
                     }
                 }
             }
             ';' => Token {
-                literal: ";",
+                literal: ";".to_string(),
                 r#type: TokenType::SEMICOLON,
             },
             '(' => Token {
-                literal: "(",
+                literal: "(".to_string(),
                 r#type: TokenType::LPAREN,
             },
             ')' => Token {
-                literal: ")",
+                literal: ")".to_string(),
                 r#type: TokenType::RPAREN,
             },
             '{' => Token {
-                literal: "{",
+                literal: "{".to_string(),
                 r#type: TokenType::LBRACE,
             },
             '}' => Token {
-                literal: "}",
+                literal: "}".to_string(),
                 r#type: TokenType::RBRACE,
             },
             ',' => Token {
-                literal: ",",
+                literal: ",".to_string(),
                 r#type: TokenType::COMMA,
             },
             '+' => Token {
-                literal: "+",
+                literal: "+".to_string(),
                 r#type: TokenType::PLUS,
             },
             '-' => Token {
-                literal: "-",
+                literal: "-".to_string(),
                 r#type: TokenType::MINUS,
             },
             '!' => {
@@ -85,34 +85,34 @@ impl<'a> Lexer<'a> {
                     self.read_char();
 
                     Token {
-                        literal: "!=",
+                        literal: "!=".to_string(),
                         r#type: TokenType::NOT_EQ,
                     }
                 } else {
                     Token {
-                        literal: "!",
+                        literal: "!".to_string(),
                         r#type: TokenType::BANG,
                     }
                 }
             }
             '*' => Token {
-                literal: "*",
+                literal: "*".to_string(),
                 r#type: TokenType::ASTERISK,
             },
             '/' => Token {
-                literal: "/",
+                literal: "/".to_string(),
                 r#type: TokenType::SLASH,
             },
             '>' => Token {
-                literal: ">",
+                literal: ">".to_string(),
                 r#type: TokenType::GT,
             },
             '<' => Token {
-                literal: "<",
+                literal: "<".to_string(),
                 r#type: TokenType::LT,
             },
             '\0' => Token {
-                literal: "\0",
+                literal: "\0".to_string(),
                 r#type: TokenType::EOF,
             },
             ch => {
@@ -120,19 +120,17 @@ impl<'a> Lexer<'a> {
                     let literal = self.read_identifier();
                     // return early since we've already read ahead in read_indentifier
                     return Token {
-                        literal,
+                        literal: literal.to_string(),
                         r#type: look_up_ident(literal),
                     };
                 } else if is_digit(ch) {
                     return Token {
                         r#type: TokenType::INT,
-                        literal: self.read_number(),
+                        literal: self.read_number().to_string(),
                     };
                 }
                 Token {
-                    // TODO: clean up this leak. Program probably ends at this point so maybe
-                    // leaking memory isn't the worst thing to do here.
-                    literal: &self.input[self.position..self.position + 1],
+                    literal: self.input[self.position..self.position + 1].to_string(),
                     r#type: TokenType::ILLEGAL,
                 }
             }
@@ -142,7 +140,7 @@ impl<'a> Lexer<'a> {
         tok
     }
 
-    fn read_number(&mut self) -> &'a str {
+    fn read_number(&mut self) -> &str {
         let position = self.position;
         while is_digit(self.ch as char) {
             self.read_char();
@@ -157,7 +155,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_identifier(&mut self) -> &'a str {
+    fn read_identifier(&mut self) -> &str {
         let position = self.position;
         while is_letter(self.ch as char) {
             self.read_char();

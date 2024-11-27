@@ -1,50 +1,49 @@
 use crate::token::{Token, TokenType};
 
-pub trait TokenLiteral<'a> {
-    fn token_literal(&self) -> &'a str;
+pub trait TokenLiteral {
+    fn token_literal(&self) -> &str;
 }
 
 struct Node {}
 
-pub struct Statement<'a> {
-    pub literal: &'a str,
+pub enum Statement {
+    LetStatement(LetStatement),
 }
 
-struct Expression {}
+#[derive(Default, Debug)]
+pub struct Expression {}
 
-struct LetStatement<'a> {
-    token: TokenType,
-    name: Identifier<'a>,
-    value: Expression,
+#[derive(Debug)]
+pub struct LetStatement {
+    pub token: TokenType,
+    pub name: Identifier,
+    pub value: Expression,
 }
 
-impl<'a> TokenLiteral<'a> for Statement<'a> {
-    fn token_literal(&self) -> &'a str {
-        self.literal
+impl TokenLiteral for LetStatement {
+    fn token_literal(&self) -> &str {
+        &self.name.value
     }
 }
 
-pub struct Program<'a> {
-    pub statements: Vec<Statement<'a>>,
-}
-//
-//impl<'a> Program<'a> {
-//    fn new(&self) -> Self {
-//        if self.statements.len() > 0 {
-//            self.statements[0].token_literal()
-//        } else {
-//            ""
-//        }
-//    }
-//}
-
-struct Identifier<'a> {
-    token: TokenType,
-    value: &'a str,
+pub struct Program {
+    pub statements: Vec<Statement>,
 }
 
-impl<'a> TokenLiteral<'a> for Identifier<'a> {
-    fn token_literal(&self) -> &'a str {
-        self.value
+impl Program {
+    fn new(&self) -> Self {
+        Program { statements: vec![] }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct Identifier {
+    pub token: TokenType,
+    pub value: String,
+}
+
+impl TokenLiteral for Identifier {
+    fn token_literal(&self) -> &str {
+        &self.value
     }
 }

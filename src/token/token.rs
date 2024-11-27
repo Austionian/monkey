@@ -65,8 +65,8 @@ pub fn look_up_ident(ident: &str) -> TokenType {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Token<'a> {
+#[derive(Debug, Default, Clone)]
+pub struct Token {
     pub r#type: TokenType,
-    pub literal: &'a str,
+    pub literal: String,
 }
