@@ -1,8 +1,9 @@
 use crate::{
-    ast::{Expression, Identifier, LetStatement, Program, Statement},
+    ast::{Expression, LetStatement, Program, Statement},
     lexer::Lexer,
-    token::{Token, TokenType},
+    token::Token,
 };
+use std::mem;
 
 struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -30,10 +31,10 @@ impl<'a> Parser<'a> {
         &self.errors
     }
 
-    fn peek_error(&mut self, token_type: &TokenType) {
+    fn peek_error(&mut self, token: &Token) {
         let msg = format!(
             "expected next token to be {:?}, got {:?} instead",
-            token_type, self.peek_token.r#type
+            token, self.peek_token
         );
         self.errors.push(msg)
     }
@@ -48,7 +49,7 @@ impl<'a> Parser<'a> {
             statements: Vec::default(),
         };
 
-        while &self.cur_token.r#type != &TokenType::EOF {
+        while &self.cur_token != &Token::EOF {
             let statement = self.parse_statement();
             if let Some(statement) = statement {
                 program.statements.push(statement);
@@ -60,61 +61,61 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
-        match self.cur_token.r#type {
-            TokenType::LET => self.parse_let_statement(),
+        match self.cur_token {
+            Token::LET => self.parse_let_statement(),
             _ => todo!(),
         }
     }
 
     fn parse_let_statement(&mut self) -> Option<Statement> {
         let mut statement = LetStatement {
-            token: self.cur_token.r#type.clone(),
-            name: Identifier::default(),
+            token: self.cur_token.clone(),
+            name: Token::default(),
             value: Expression::default(),
         };
 
-        if !self.expect_peek(TokenType::IDENT) {
+        if !self.expect_peek(Token::IDENT(String::default())) {
             return None;
         }
 
-        statement.name = Identifier {
-            value: self.cur_token.literal.clone(),
-            token: self.cur_token.r#type.clone(),
-        };
+        statement.name = self.cur_token.clone();
 
-        if !self.expect_peek(TokenType::ASSIGN) {
+        if !self.expect_peek(Token::ASSIGN) {
             return None;
         }
 
-        while !self.cur_token_is(TokenType::SEMICOLON) {
+        while !self.cur_token_is(Token::SEMICOLON) {
             self.next_token();
         }
 
         Some(Statement::LetStatement(statement))
     }
 
-    fn peek_token_is(&self, token_type: &TokenType) -> bool {
-        &self.peek_token.r#type == token_type
+    fn peek_token_is(&self, token: &Token) -> bool {
+        mem::discriminant(&self.peek_token) == mem::discriminant(token)
     }
 
-    fn expect_peek(&mut self, token_type: TokenType) -> bool {
-        if self.peek_token_is(&token_type) {
+    fn expect_peek(&mut self, token: Token) -> bool {
+        if self.peek_token_is(&token) {
             self.next_token();
             return true;
         }
-        self.peek_error(&token_type);
+        self.peek_error(&token);
         false
     }
 
-    fn cur_token_is(&self, token_type: TokenType) -> bool {
-        self.cur_token.r#type == token_type
+    fn cur_token_is(&self, token: Token) -> bool {
+        mem::discriminant(&self.cur_token) == mem::discriminant(&token)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{ast::Statement, token::TokenType};
+    use crate::{
+        ast::{Statement, TokenLiteral},
+        token::Token,
+    };
 
     struct ExpectedIdent {
         ident: &'static str,
@@ -123,11 +124,11 @@ mod test {
     fn test_let_statement(statement: &Statement, name: &str) -> bool {
         match statement {
             Statement::LetStatement(statement) => {
-                if statement.token != TokenType::LET {
+                if statement.token != Token::LET {
                     eprint!("Expected Let token, got: {:?}", statement.token);
                     return false;
                 }
-                if statement.name.value != name {
+                if statement.name.token_literal() != name {
                     eprint!("Expected name {:?}, got: {:?}", name, statement.token);
                     return false;
                 }

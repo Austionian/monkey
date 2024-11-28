@@ -1,11 +1,12 @@
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 
 pub trait TokenLiteral {
-    fn token_literal(&self) -> &str;
+    fn token_literal(&self) -> String;
 }
 
 struct Node {}
 
+#[derive(Debug)]
 pub enum Statement {
     LetStatement(LetStatement),
 }
@@ -15,17 +16,12 @@ pub struct Expression {}
 
 #[derive(Debug)]
 pub struct LetStatement {
-    pub token: TokenType,
-    pub name: Identifier,
+    pub token: Token,
+    pub name: Token,
     pub value: Expression,
 }
 
-impl TokenLiteral for LetStatement {
-    fn token_literal(&self) -> &str {
-        &self.name.value
-    }
-}
-
+#[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -33,17 +29,5 @@ pub struct Program {
 impl Program {
     fn new(&self) -> Self {
         Program { statements: vec![] }
-    }
-}
-
-#[derive(Default, Debug)]
-pub struct Identifier {
-    pub token: TokenType,
-    pub value: String,
-}
-
-impl TokenLiteral for Identifier {
-    fn token_literal(&self) -> &str {
-        &self.value
     }
 }
