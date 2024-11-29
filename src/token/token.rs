@@ -1,5 +1,8 @@
-use crate::ast::TokenLiteral;
-use std::{cell::LazyCell, collections::HashMap};
+use crate::{
+    ast::{Expression, TokenLiteral},
+    parser::Parser,
+};
+use std::{cell::LazyCell, collections::HashMap, process::Output};
 
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Debug, Clone, Default)]
@@ -43,6 +46,19 @@ pub enum Token {
     IF,
     ELSE,
     RETURN,
+}
+
+fn parse_ident(p: &mut Parser) -> Expression {
+    Expression::IdentExpression(p.cur_token.clone())
+}
+
+impl Token {
+    pub fn prefix_function(&self) -> Option<impl Fn(&mut Parser) -> Expression> {
+        match self {
+            Token::IDENT(_) => Some(parse_ident),
+            _ => todo!(),
+        }
+    }
 }
 
 impl TokenLiteral for Token {
