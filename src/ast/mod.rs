@@ -17,6 +17,7 @@ pub enum Statement {
 #[derive(Default, Debug)]
 pub enum Expression {
     IdentExpression(Token),
+    IntExpression(Token),
     #[default]
     UnknownExpression,
 }

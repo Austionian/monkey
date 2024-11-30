@@ -52,10 +52,15 @@ fn parse_ident(p: &mut Parser) -> Expression {
     Expression::IdentExpression(p.cur_token.clone())
 }
 
+fn parse_int(p: &mut Parser) -> Expression {
+    Expression::IntExpression(p.cur_token.clone())
+}
+
 impl Token {
-    pub fn prefix_function(&self) -> Option<impl Fn(&mut Parser) -> Expression> {
+    pub fn prefix_function(&self) -> Option<fn(&mut Parser) -> Expression> {
         match self {
             Token::IDENT(_) => Some(parse_ident),
+            Token::INT(_) => Some(parse_int),
             _ => todo!(),
         }
     }

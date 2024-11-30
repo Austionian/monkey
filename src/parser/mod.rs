@@ -161,7 +161,8 @@ impl<'a> Parser<'a> {
 mod test {
     use super::*;
     use crate::{
-        ast::{ExpressionStatement, Statement, TokenLiteral},
+        ast::{Statement, TokenLiteral},
+        test_setup,
         token::Token,
     };
     use core::panic;
@@ -217,17 +218,9 @@ mod test {
         let foobar = 838383;
         "#;
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
+        let program = test_setup!(input);
 
-        let program = parser.parse_program();
-        check_parse_errors(&parser);
-
-        let program = program.unwrap();
-
-        if program.statements.len() != 3 {
-            panic!("There are 3 statements!");
-        }
+        assert_eq!(program.statements.len(), 3);
 
         let test_idents = vec![
             ExpectedIdent { ident: "x" },
@@ -250,22 +243,12 @@ mod test {
         return 993322;
         "#;
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
+        let program = test_setup!(input);
 
-        let program = parser.parse_program();
-        check_parse_errors(&parser);
-
-        let program = program.unwrap();
-
-        if program.statements.len() != 3 {
-            panic!("There are 3 statements!");
-        }
+        assert_eq!(program.statements.len(), 3);
 
         for statement in program.statements.iter() {
-            if !test_statement(statement, "n/a") {
-                panic!("test failed!");
-            }
+            assert!(test_statement(statement, "n/a"))
         }
     }
 
@@ -273,15 +256,9 @@ mod test {
     fn test_indet_expression() {
         let input = "foobar";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parse_errors(&parser);
+        let program = test_setup!(input);
 
-        let program = program.unwrap();
-        if program.statements.len() != 1 {
-            panic!("There should only be one statement");
-        }
+        assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
             Statement::ExpressStatement(statement) => match &statement.value {
@@ -293,4 +270,40 @@ mod test {
             _ => panic!("There should only be an expression statement"),
         }
     }
+
+    #[test]
+    fn test_integer_expression() {
+        let input = "5;";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(statement) => match &statement.value {
+                Expression::IntExpression(token) => {
+                    assert_eq!(&token.token_literal(), "5");
+
+                    match token {
+                        Token::INT(value) => assert_eq!(*value, 5),
+                        _ => panic!("Only INT token expected."),
+                    }
+                }
+                _ => panic!("Expected IntExpression"),
+            },
+            _ => panic!("There should only be an expression statement"),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! test_setup {
+    ($input: expr) => {{
+        let lexer = Lexer::new($input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        program.unwrap()
+    }};
 }
