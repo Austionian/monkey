@@ -1,6 +1,6 @@
 use crate::{
-    ast::{Expression, TokenLiteral},
-    parser::Parser,
+    ast::{Expression, ExpressionStatement, TokenLiteral},
+    parser::{ExpressionPrecendence, Parser},
 };
 use std::{cell::LazyCell, collections::HashMap, process::Output};
 
@@ -56,11 +56,26 @@ fn parse_int(p: &mut Parser) -> Expression {
     Expression::IntExpression(p.cur_token.clone())
 }
 
+fn parse_prefix_expression(p: &mut Parser) -> Expression {
+    let prefix = p.cur_token.clone();
+    p.next_token();
+    let right = p.parse_expression(ExpressionPrecendence::PREFIX).unwrap();
+    Expression::PrefixExpression((
+        prefix,
+        Box::new(ExpressionStatement {
+            token: p.cur_token.clone(),
+            value: right,
+        }),
+    ))
+}
+
 impl Token {
     pub fn prefix_function(&self) -> Option<fn(&mut Parser) -> Expression> {
         match self {
             Token::IDENT(_) => Some(parse_ident),
             Token::INT(_) => Some(parse_int),
+            Token::BANG => Some(parse_prefix_expression),
+            Token::MINUS => Some(parse_prefix_expression),
             _ => todo!(),
         }
     }

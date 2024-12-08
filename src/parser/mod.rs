@@ -5,7 +5,7 @@ use crate::{
 };
 use std::mem;
 
-enum ExpressionPrecendences {
+pub enum ExpressionPrecendence {
     LOWEST = 1,
     EQUALS = 2,
     LessGreater = 3,
@@ -41,6 +41,11 @@ impl<'a> Parser<'a> {
         &self.errors
     }
 
+    fn no_prefix_parse_error(&mut self, token: &Token) {
+        let msg = format!("no prefix parse function for {:?} found", token);
+        self.errors.push(msg)
+    }
+
     fn peek_error(&mut self, token: &Token) {
         let msg = format!(
             "expected next token to be {:?}, got {:?} instead",
@@ -49,7 +54,7 @@ impl<'a> Parser<'a> {
         self.errors.push(msg)
     }
 
-    fn next_token(&mut self) {
+    pub fn next_token(&mut self) {
         self.cur_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
     }
@@ -79,7 +84,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expression(&mut self, precendence: ExpressionPrecendences) -> Option<Expression> {
+    pub fn parse_expression(&mut self, precendence: ExpressionPrecendence) -> Option<Expression> {
         self.cur_token.prefix_function().map(|f| f(self))
     }
 
@@ -90,7 +95,7 @@ impl<'a> Parser<'a> {
         };
 
         statement.value = self
-            .parse_expression(ExpressionPrecendences::LOWEST)
+            .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("No expression found")?;
 
         if self.peek_token_is(&Token::SEMICOLON) {
@@ -293,6 +298,34 @@ mod test {
             },
             _ => panic!("There should only be an expression statement"),
         }
+    }
+
+    #[test]
+    fn test_prefix_operator() {
+        let inputs = vec!["!5;", "-15"];
+        let expected_prefix = vec!["!", "-"];
+        let expected_int = vec![5, 15];
+
+        inputs.iter().enumerate().for_each(|(i, input)| {
+            let program = test_setup!(input);
+
+            assert_eq!(program.statements.len(), 1);
+
+            match &program.statements[0] {
+                Statement::ExpressStatement(statement) => match &statement.value {
+                    Expression::PrefixExpression((prefix_token, int_expression)) => {
+                        assert_eq!(&prefix_token.token_literal(), expected_prefix[i]);
+
+                        match int_expression.as_ref().token {
+                            Token::INT(value) => assert_eq!(value, expected_int[i]),
+                            _ => panic!("Only INT token expected."),
+                        }
+                    }
+                    _ => panic!("Expected IntExpression"),
+                },
+                _ => panic!("There should only be an expression statement"),
+            }
+        })
     }
 }
 

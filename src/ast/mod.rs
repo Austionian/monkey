@@ -16,6 +16,7 @@ pub enum Statement {
 
 #[derive(Default, Debug)]
 pub enum Expression {
+    PrefixExpression((Token, Box<ExpressionStatement>)),
     IdentExpression(Token),
     IntExpression(Token),
     #[default]
