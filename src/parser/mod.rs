@@ -3,8 +3,9 @@ use crate::{
     lexer::Lexer,
     token::Token,
 };
-use std::mem;
+use std::{cell::LazyCell, collections::HashMap, mem};
 
+#[derive(Clone, PartialEq, PartialOrd)]
 pub enum ExpressionPrecendence {
     LOWEST = 1,
     EQUALS = 2,
@@ -14,6 +15,21 @@ pub enum ExpressionPrecendence {
     PREFIX = 6,
     CALL = 7,
 }
+
+const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyCell::new(|| {
+    let mut map = HashMap::new();
+
+    map.insert(Token::EQ, ExpressionPrecendence::EQUALS);
+    map.insert(Token::NOT_EQ, ExpressionPrecendence::EQUALS);
+    map.insert(Token::LT, ExpressionPrecendence::LessGreater);
+    map.insert(Token::GT, ExpressionPrecendence::LessGreater);
+    map.insert(Token::PLUS, ExpressionPrecendence::SUM);
+    map.insert(Token::MINUS, ExpressionPrecendence::SUM);
+    map.insert(Token::SLASH, ExpressionPrecendence::PRODUCT);
+    map.insert(Token::ASTERISK, ExpressionPrecendence::PRODUCT);
+
+    map
+});
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -41,8 +57,8 @@ impl<'a> Parser<'a> {
         &self.errors
     }
 
-    fn no_prefix_parse_error(&mut self, token: &Token) {
-        let msg = format!("no prefix parse function for {:?} found", token);
+    fn no_prefix_parse_error(&mut self) {
+        let msg = format!("no prefix parse function for {:?} found", self.cur_token);
         self.errors.push(msg)
     }
 
@@ -85,7 +101,27 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expression(&mut self, precendence: ExpressionPrecendence) -> Option<Expression> {
-        self.cur_token.prefix_function().map(|f| f(self))
+        let prefix_fn = self.cur_token.prefix_function();
+        if prefix_fn.is_none() {
+            self.no_prefix_parse_error();
+            return None;
+        }
+        let prefix_fn = prefix_fn.unwrap();
+        let mut left_expression = prefix_fn(self);
+
+        while !self.peek_token_is(&Token::SEMICOLON) && precendence < self.peek_precedence() {
+            let infix_fn = self.peek_token.infix_function();
+            if infix_fn.is_none() {
+                return Some(left_expression);
+            }
+
+            self.next_token();
+
+            let infix_fn = infix_fn.unwrap();
+            left_expression = infix_fn(self, left_expression);
+        }
+
+        Some(left_expression)
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, String> {
@@ -146,6 +182,22 @@ impl<'a> Parser<'a> {
 
     fn peek_token_is(&self, token: &Token) -> bool {
         mem::discriminant(&self.peek_token) == mem::discriminant(token)
+    }
+
+    pub fn peek_precedence(&self) -> ExpressionPrecendence {
+        if let Some(precedence) = TOKEN_PRECEDENCES.get(&self.peek_token) {
+            precedence.clone()
+        } else {
+            ExpressionPrecendence::LOWEST
+        }
+    }
+
+    pub fn cur_precendence(&self) -> ExpressionPrecendence {
+        if let Some(precedence) = TOKEN_PRECEDENCES.get(&self.cur_token) {
+            precedence.clone()
+        } else {
+            ExpressionPrecendence::LOWEST
+        }
     }
 
     fn expect_peek(&mut self, token: Token) -> bool {
@@ -326,6 +378,45 @@ mod test {
                 _ => panic!("There should only be an expression statement"),
             }
         })
+    }
+
+    #[test]
+    fn test_infix_operators() {
+        let inputs = vec![
+            "5 + 5", "5 - 5", "5 * 5", "5 / 5", "5 > 5", "5 < 5", "5 == 5", "5 != 5",
+        ];
+        let expected_infix = vec!["+", "-", "*", "/", ">", "<", "==", "!="];
+        let expected_int = vec![5; 8];
+
+        inputs.iter().enumerate().for_each(|(i, input)| {
+            let program = test_setup!(input);
+
+            assert_eq!(program.statements.len(), 1);
+
+            match &program.statements[0] {
+                Statement::ExpressStatement(statement) => match &statement.value {
+                    Expression::InfixExpression((
+                        infix_token,
+                        left_expression,
+                        right_expression,
+                    )) => {
+                        assert_eq!(&infix_token.token_literal(), expected_infix[i]);
+
+                        match left_expression.as_ref().token {
+                            Token::INT(value) => assert_eq!(value, expected_int[i]),
+                            _ => panic!("Only INT token expected"),
+                        }
+
+                        match right_expression.as_ref().token {
+                            Token::INT(value) => assert_eq!(value, expected_int[i]),
+                            _ => panic!("Only INT token expected"),
+                        }
+                    }
+                    _ => panic!("Expected InfixExpression"),
+                },
+                _ => panic!("There should only be an ExpressionStatement"),
+            }
+        });
     }
 }
 

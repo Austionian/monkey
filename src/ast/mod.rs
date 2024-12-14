@@ -14,13 +14,21 @@ pub enum Statement {
     ExpressStatement(ExpressionStatement),
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub enum Expression {
+    // Token, Right
     PrefixExpression((Token, Box<ExpressionStatement>)),
+    // Token, Left, Right
+    InfixExpression((Token, Box<ExpressionStatement>, Box<ExpressionStatement>)),
     IdentExpression(Token),
     IntExpression(Token),
-    #[default]
-    UnknownExpression,
+    UnknownExpression(Token),
+}
+
+impl Default for Expression {
+    fn default() -> Self {
+        Expression::UnknownExpression(Token::default())
+    }
 }
 
 #[derive(Debug)]

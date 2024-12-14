@@ -2,10 +2,10 @@ use crate::{
     ast::{Expression, ExpressionStatement, TokenLiteral},
     parser::{ExpressionPrecendence, Parser},
 };
-use std::{cell::LazyCell, collections::HashMap, process::Output};
+use std::{cell::LazyCell, collections::HashMap};
 
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone, Default, Hash, Eq)]
 pub enum Token {
     ILLEGAL(String),
     EOF,
@@ -69,13 +69,52 @@ fn parse_prefix_expression(p: &mut Parser) -> Expression {
     ))
 }
 
+fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
+    let infix = p.cur_token.clone();
+    let precendence = p.cur_precendence();
+
+    p.next_token();
+
+    let right = p.parse_expression(precendence).unwrap();
+
+    let token = match left {
+        Expression::UnknownExpression(ref t) => t.clone(),
+        Expression::InfixExpression((ref t, _, _)) => t.clone(),
+        Expression::IntExpression(ref t) => t.clone(),
+        Expression::IdentExpression(ref t) => t.clone(),
+        Expression::PrefixExpression((ref t, _)) => t.clone(),
+    };
+
+    Expression::InfixExpression((
+        infix,
+        Box::new(ExpressionStatement { token, value: left }),
+        Box::new(ExpressionStatement {
+            token: p.cur_token.clone(),
+            value: right,
+        }),
+    ))
+}
+
 impl Token {
     pub fn prefix_function(&self) -> Option<fn(&mut Parser) -> Expression> {
         match self {
             Token::IDENT(_) => Some(parse_ident),
             Token::INT(_) => Some(parse_int),
-            Token::BANG => Some(parse_prefix_expression),
-            Token::MINUS => Some(parse_prefix_expression),
+            Token::BANG | Token::MINUS => Some(parse_prefix_expression),
+            _ => todo!(),
+        }
+    }
+
+    pub fn infix_function(&self) -> Option<fn(&mut Parser, Expression) -> Expression> {
+        match self {
+            Token::PLUS
+            | Token::MINUS
+            | Token::SLASH
+            | Token::ASTERISK
+            | Token::EQ
+            | Token::NOT_EQ
+            | Token::LT
+            | Token::GT => Some(parse_infix_expression),
             _ => todo!(),
         }
     }
