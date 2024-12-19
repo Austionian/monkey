@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
             statements: Vec::default(),
         };
 
-        while &self.cur_token != &Token::EOF {
+        while self.cur_token != Token::EOF {
             let statement = self.parse_statement();
             match statement {
                 Ok(statement) => program.statements.push(statement),
@@ -224,10 +224,6 @@ mod test {
     };
     use core::panic;
 
-    struct ExpectedIdent {
-        ident: &'static str,
-    }
-
     fn test_statement(statement: &Statement, name: &str) -> bool {
         match statement {
             Statement::LetStatement(statement) => {
@@ -279,17 +275,11 @@ mod test {
 
         assert_eq!(program.statements.len(), 3);
 
-        let test_idents = vec![
-            ExpectedIdent { ident: "x" },
-            ExpectedIdent { ident: "y" },
-            ExpectedIdent { ident: "foobar" },
-        ];
+        let test_idents = vec!["x", "y", "foobar"];
 
         for (i, expected) in test_idents.iter().enumerate() {
             let statement = program.statements.get(i).unwrap();
-            if !test_statement(statement, expected.ident) {
-                panic!("test failed!");
-            }
+            assert!(test_statement(statement, expected))
         }
     }
 
@@ -416,6 +406,33 @@ mod test {
                 },
                 _ => panic!("There should only be an ExpressionStatement"),
             }
+        });
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let inputs = [
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
+
+        inputs.iter().enumerate().for_each(|(i, input)| {
+            let program = test_setup!(input.0);
+
+            assert_eq!(program.to_string(), inputs[i].1);
         });
     }
 }

@@ -16,7 +16,7 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub enum Expression {
-    // Token, Right
+    // Token ie prefix, Right
     PrefixExpression((Token, Box<ExpressionStatement>)),
     // Token, Left, Right
     InfixExpression((Token, Box<ExpressionStatement>, Box<ExpressionStatement>)),
@@ -70,10 +70,41 @@ impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut buffer = String::new();
         match self {
-            Self::LetStatement(s) => buffer.push_str(&s.to_string()),
+            Self::LetStatement(s) => {
+                buffer.push_str(&format!(
+                    "{} {} = {};",
+                    s.token.token_literal(),
+                    s.name.token_literal(),
+                    s.value.to_string()
+                ));
+            }
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
             Self::ExpressStatement(s) => buffer.push_str(&s.to_string()),
         };
+
+        write!(f, "{buffer}")
+    }
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buffer = String::new();
+        match self {
+            Self::IntExpression(t) => buffer.push_str(&t.token_literal()),
+            Self::InfixExpression(t) => buffer.push_str(&format!(
+                "({} {} {})",
+                t.1.value.to_string(),
+                t.0.token_literal(),
+                t.2.value.to_string()
+            )),
+            Self::IdentExpression(t) => buffer.push_str(&t.token_literal()),
+            Self::PrefixExpression(t) => buffer.push_str(&format!(
+                "({}{})",
+                t.0.token_literal(),
+                t.1.value.to_string(),
+            )),
+            Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
+        }
 
         write!(f, "{buffer}")
     }
@@ -98,7 +129,7 @@ impl Display for ReturnStatement {
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token.token_literal())
+        write!(f, "{}", &self.value.to_string())
     }
 }
 
@@ -124,6 +155,46 @@ mod test {
                 value: Expression::default(),
             }));
 
-        assert_eq!(program.to_string(), "let test = ;");
+        assert_eq!(program.to_string(), "let test = fn;");
+    }
+
+    #[test]
+    fn test_iden() {
+        let mut program = Program::new();
+
+        program
+            .statements
+            .push(Statement::LetStatement(LetStatement {
+                token: Token::LET,
+                name: Token::IDENT("myVar".to_string()),
+                value: Expression::IdentExpression(Token::IDENT("anotherVar".to_string())),
+            }));
+
+        assert_eq!(program.to_string(), "let myVar = anotherVar;");
+    }
+
+    #[test]
+    fn test_prefix() {
+        let mut program = Program::new();
+        program
+            .statements
+            .push(Statement::ExpressStatement(ExpressionStatement {
+                token: Token::BANG,
+                value: Expression::PrefixExpression((
+                    Token::BANG,
+                    Box::new(ExpressionStatement {
+                        token: Token::IDENT("a".to_string()),
+                        value: Expression::PrefixExpression((
+                            Token::MINUS,
+                            Box::new(ExpressionStatement {
+                                token: Token::IDENT("a".to_string()),
+                                value: Expression::IntExpression(Token::IDENT("a".to_string())),
+                            }),
+                        )),
+                    }),
+                )),
+            }));
+
+        assert_eq!(program.to_string(), "(!(-a))");
     }
 }
