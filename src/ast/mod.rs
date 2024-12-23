@@ -22,6 +22,7 @@ pub enum Expression {
     InfixExpression((Token, Box<ExpressionStatement>, Box<ExpressionStatement>)),
     IdentExpression(Token),
     IntExpression(Token),
+    BoolExpression(Token),
     UnknownExpression(Token),
 }
 
@@ -75,7 +76,7 @@ impl Display for Statement {
                     "{} {} = {};",
                     s.token.token_literal(),
                     s.name.token_literal(),
-                    s.value.to_string()
+                    s.value
                 ));
             }
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
@@ -93,16 +94,15 @@ impl Display for Expression {
             Self::IntExpression(t) => buffer.push_str(&t.token_literal()),
             Self::InfixExpression(t) => buffer.push_str(&format!(
                 "({} {} {})",
-                t.1.value.to_string(),
+                t.1.value,
                 t.0.token_literal(),
-                t.2.value.to_string()
+                t.2.value
             )),
             Self::IdentExpression(t) => buffer.push_str(&t.token_literal()),
-            Self::PrefixExpression(t) => buffer.push_str(&format!(
-                "({}{})",
-                t.0.token_literal(),
-                t.1.value.to_string(),
-            )),
+            Self::PrefixExpression(t) => {
+                buffer.push_str(&format!("({}{})", t.0.token_literal(), t.1.value))
+            }
+            Self::BoolExpression(t) => buffer.push_str(&t.token_literal()),
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }
 
@@ -129,7 +129,7 @@ impl Display for ReturnStatement {
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.value.to_string())
+        write!(f, "{}", &self.value)
     }
 }
 

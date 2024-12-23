@@ -106,8 +106,8 @@ impl<'a> Parser<'a> {
             self.no_prefix_parse_error();
             return None;
         }
-        let prefix_fn = prefix_fn.unwrap();
-        let mut left_expression = prefix_fn(self);
+        let prefix_fn = prefix_fn?;
+        let mut left_expression = prefix_fn(self)?;
 
         while !self.peek_token_is(&Token::SEMICOLON) && precendence < self.peek_precedence() {
             let infix_fn = self.peek_token.infix_function();
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expect_peek(&mut self, token: Token) -> bool {
+    pub fn expect_peek(&mut self, token: Token) -> bool {
         if self.peek_token_is(&token) {
             self.next_token();
             return true;
@@ -343,10 +343,33 @@ mod test {
     }
 
     #[test]
+    fn test_bool_expression() {
+        let inputs = ["false;", "true;"];
+        let expected = ["false", "true"];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let program = test_setup!(input);
+
+            assert_eq!(program.statements.len(), 1);
+
+            match &program.statements[0] {
+                Statement::ExpressStatement(statement) => match &statement.value {
+                    Expression::BoolExpression(token) => {
+                        assert_eq!(&token.token_literal(), expected[i]);
+                    }
+                    _ => panic!("Expected BoolExpression"),
+                },
+                _ => panic!("There should only be an expression statement"),
+            }
+        }
+    }
+
+    #[test]
     fn test_prefix_operator() {
-        let inputs = vec!["!5;", "-15"];
-        let expected_prefix = vec!["!", "-"];
+        let inputs = vec!["!5;", "-15", "!false", "!true"];
+        let expected_prefix = vec!["!", "-", "!", "!"];
         let expected_int = vec![5, 15];
+        let expected_bool = vec!["false", "true"];
 
         inputs.iter().enumerate().for_each(|(i, input)| {
             let program = test_setup!(input);
@@ -360,10 +383,18 @@ mod test {
 
                         match int_expression.as_ref().token {
                             Token::INT(value) => assert_eq!(value, expected_int[i]),
-                            _ => panic!("Only INT token expected."),
+                            Token::FALSE => assert_eq!(
+                                int_expression.token.token_literal(),
+                                expected_bool[i - 2]
+                            ),
+                            Token::TRUE => assert_eq!(
+                                int_expression.token.token_literal(),
+                                expected_bool[i - 2]
+                            ),
+                            _ => panic!("Only INT or Bool token expected."),
                         }
                     }
-                    _ => panic!("Expected IntExpression"),
+                    _ => panic!("Expected PrefixExpression"),
                 },
                 _ => panic!("There should only be an expression statement"),
             }
@@ -407,6 +438,44 @@ mod test {
                 _ => panic!("There should only be an ExpressionStatement"),
             }
         });
+
+        let inputs = vec!["true == true", "true != false", "true == true"];
+        let expected_infix = vec!["==", "!=", "=="];
+        let expected_bool = vec!["true", "true", "true", "false", "true", "true"];
+
+        inputs.iter().enumerate().for_each(|(i, input)| {
+            let program = test_setup!(input);
+
+            assert_eq!(program.statements.len(), 1);
+
+            match &program.statements[0] {
+                Statement::ExpressStatement(statement) => match &statement.value {
+                    Expression::InfixExpression((
+                        infix_token,
+                        left_expression,
+                        right_expression,
+                    )) => {
+                        assert_eq!(&infix_token.token_literal(), expected_infix[i]);
+
+                        match left_expression.as_ref().token {
+                            Token::FALSE | Token::TRUE => {
+                                assert_eq!(left_expression.token.token_literal(), expected_bool[i])
+                            }
+                            _ => panic!("Only bool token expected"),
+                        }
+
+                        match right_expression.as_ref().token {
+                            Token::FALSE | Token::TRUE => {
+                                assert_eq!(left_expression.token.token_literal(), expected_bool[i])
+                            }
+                            _ => panic!("Only bool token expected"),
+                        }
+                    }
+                    _ => panic!("Expected InfixExpression"),
+                },
+                _ => panic!("There should only be an ExpressionStatement"),
+            }
+        });
     }
 
     #[test]
@@ -427,6 +496,16 @@ mod test {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == false", "((3 < 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         inputs.iter().enumerate().for_each(|(i, input)| {
