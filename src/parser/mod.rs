@@ -545,7 +545,7 @@ mod test {
         match &program.statements[0] {
             Statement::ExpressStatement(expression_statement) => {
                 match &expression_statement.value {
-                    Expression::IfExpression(_, conditional, consequence, _) => {
+                    Expression::IfExpression(_, conditional, consequence, alt) => {
                         match &conditional.value {
                             Expression::InfixExpression((t, left, right)) => {
                                 if let Expression::IdentExpression(t) = &left.value {
@@ -568,6 +568,8 @@ mod test {
                             },
                             _ => panic!("Expected an ExpressionStatement"),
                         }
+
+                        assert!(alt.is_none());
                     }
                     _ => panic!("Should only be an if expression"),
                 }
