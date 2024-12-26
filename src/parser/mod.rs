@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Expression, ExpressionStatement, LetStatement, Program, ReturnStatement, Statement},
+    ast::{
+        BlockStatement, Expression, ExpressionStatement, LetStatement, Program, ReturnStatement,
+        Statement,
+    },
     lexer::Lexer,
     token::Token,
 };
@@ -141,6 +144,22 @@ impl<'a> Parser<'a> {
         Ok(Statement::ExpressStatement(statement))
     }
 
+    pub fn parse_block_statement(&mut self) -> Result<BlockStatement, String> {
+        let token = self.cur_token.clone();
+        let mut statements = Vec::new();
+
+        self.next_token();
+
+        while !self.cur_token_is(Token::RBRACE) && !self.cur_token_is(Token::EOF) {
+            let statement = self.parse_statement()?;
+            statements.push(statement);
+
+            self.next_token();
+        }
+
+        Ok(BlockStatement { token, statements })
+    }
+
     fn parse_return_statement(&mut self) -> Result<Statement, String> {
         let statement = ReturnStatement {
             token: self.cur_token.clone(),
@@ -180,7 +199,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::LetStatement(statement))
     }
 
-    fn peek_token_is(&self, token: &Token) -> bool {
+    pub fn peek_token_is(&self, token: &Token) -> bool {
         mem::discriminant(&self.peek_token) == mem::discriminant(token)
     }
 
@@ -218,7 +237,7 @@ impl<'a> Parser<'a> {
 mod test {
     use super::*;
     use crate::{
-        ast::{Statement, TokenLiteral},
+        ast::{BlockStatement, Statement, TokenLiteral},
         test_setup,
         token::Token,
     };
@@ -513,6 +532,101 @@ mod test {
 
             assert_eq!(program.to_string(), inputs[i].1);
         });
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression_statement) => {
+                match &expression_statement.value {
+                    Expression::IfExpression(_, conditional, consequence, _) => {
+                        match &conditional.value {
+                            Expression::InfixExpression((t, left, right)) => {
+                                if let Expression::IdentExpression(t) = &left.value {
+                                    assert_eq!(t.token_literal(), "x");
+                                }
+                                assert_eq!(t.token_literal(), "<");
+                                if let Expression::IdentExpression(t) = &right.value {
+                                    assert_eq!(t.token_literal(), "y");
+                                }
+                            }
+                            _ => panic!("Expected an infix expression"),
+                        }
+
+                        match &consequence.statements[0] {
+                            Statement::ExpressStatement(exp) => match &exp.value {
+                                Expression::IdentExpression(t) => {
+                                    assert_eq!(t.token_literal(), "x");
+                                }
+                                _ => panic!("Expected IdentExpression"),
+                            },
+                            _ => panic!("Expected an ExpressionStatement"),
+                        }
+                    }
+                    _ => panic!("Should only be an if expression"),
+                }
+            }
+            _ => panic!("Should first be an expression statement"),
+        }
+    }
+
+    fn test_if_expression_with_else() {
+        let input = "if (x < y) { x } else { y }";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression_statement) => {
+                match &expression_statement.value {
+                    Expression::IfExpression(_, conditional, consequence, alt) => {
+                        match &conditional.value {
+                            Expression::InfixExpression((t, left, right)) => {
+                                if let Expression::IdentExpression(t) = &left.value {
+                                    assert_eq!(t.token_literal(), "x");
+                                }
+                                assert_eq!(t.token_literal(), "<");
+                                if let Expression::IdentExpression(t) = &right.value {
+                                    assert_eq!(t.token_literal(), "y");
+                                }
+                            }
+                            _ => panic!("Expected an infix expression"),
+                        }
+
+                        match &consequence.statements[0] {
+                            Statement::ExpressStatement(exp) => match &exp.value {
+                                Expression::IdentExpression(t) => {
+                                    assert_eq!(t.token_literal(), "x");
+                                }
+                                _ => panic!("Expected IdentExpression"),
+                            },
+                            _ => panic!("Expected an ExpressionStatement"),
+                        }
+
+                        if let Some(alternative) = alt {
+                            match &alternative.statements[0] {
+                                Statement::ExpressStatement(exp) => match &exp.value {
+                                    Expression::IdentExpression(t) => {
+                                        assert_eq!(t.token_literal(), "x");
+                                    }
+                                    _ => panic!("Expected IdentExpression"),
+                                },
+                                _ => panic!("Expected an ExpressionStatement"),
+                            }
+                        }
+                    }
+                    _ => panic!("Should only be an if expression"),
+                }
+            }
+            _ => panic!("Should first be an expression statement"),
+        }
     }
 }
 

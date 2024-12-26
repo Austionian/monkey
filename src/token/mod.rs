@@ -85,6 +85,49 @@ fn parse_grouped_expression(p: &mut Parser) -> Option<Expression> {
     exp
 }
 
+fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
+    let token = p.cur_token.clone();
+
+    if !p.expect_peek(Token::LPAREN) {
+        return None;
+    }
+
+    p.next_token();
+
+    let condition = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+
+    if !p.expect_peek(Token::RPAREN) {
+        return None;
+    }
+
+    if !p.expect_peek(Token::LBRACE) {
+        return None;
+    }
+
+    let consequence = p.parse_block_statement().ok()?;
+    let mut alternative = None;
+
+    if p.peek_token_is(&Token::ELSE) {
+        p.next_token();
+
+        if !p.expect_peek(Token::LBRACE) {
+            return None;
+        }
+
+        alternative = Some(Box::new(p.parse_block_statement().ok()?));
+    }
+
+    Some(Expression::IfExpression(
+        token,
+        Box::new(ExpressionStatement {
+            value: condition,
+            token: Token::default(),
+        }),
+        Box::new(consequence),
+        alternative,
+    ))
+}
+
 fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
     let infix = p.cur_token.clone();
     let precendence = p.cur_precendence();
@@ -100,6 +143,7 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
         Expression::IdentExpression(ref t) => t.clone(),
         Expression::PrefixExpression((ref t, _)) => t.clone(),
         Expression::BoolExpression(ref t) => t.clone(),
+        Expression::IfExpression(ref t, _, _, _) => t.clone(),
     };
 
     Expression::InfixExpression((
@@ -120,6 +164,7 @@ impl Token {
             Token::BANG | Token::MINUS => Some(parse_prefix_expression),
             Token::TRUE | Token::FALSE => Some(parse_bool_expression),
             Token::LPAREN => Some(parse_grouped_expression),
+            Token::IF => Some(parse_if_expression),
             _ => todo!(),
         }
     }

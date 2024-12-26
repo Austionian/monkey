@@ -23,6 +23,13 @@ pub enum Expression {
     IdentExpression(Token),
     IntExpression(Token),
     BoolExpression(Token),
+    // Token, condition, consequence, alternative
+    IfExpression(
+        Token,
+        Box<ExpressionStatement>,
+        Box<BlockStatement>,
+        Option<Box<BlockStatement>>,
+    ),
     UnknownExpression(Token),
 }
 
@@ -49,6 +56,22 @@ pub struct ReturnStatement {
 pub struct ExpressionStatement {
     pub token: Token,
     pub value: Expression,
+}
+
+#[derive(Debug, Default)]
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Statement>,
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buffer = String::new();
+        for s in self.statements.iter() {
+            buffer.push_str(&s.to_string());
+        }
+        write!(f, "{buffer}")
+    }
 }
 
 #[derive(Debug)]
@@ -103,6 +126,17 @@ impl Display for Expression {
                 buffer.push_str(&format!("({}{})", t.0.token_literal(), t.1.value))
             }
             Self::BoolExpression(t) => buffer.push_str(&t.token_literal()),
+            Self::IfExpression(_, condition, consequnce, alternative) => {
+                buffer.push_str(&format!(
+                    "if {} {}",
+                    condition.to_string(),
+                    consequnce.to_string()
+                ));
+
+                if let Some(alt) = alternative {
+                    buffer.push_str(&format!("else {}", alt.to_string()));
+                }
+            }
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }
 
