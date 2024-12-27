@@ -146,6 +146,21 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
     ))
 }
 
+fn parse_call_expression(p: &mut Parser, function: Expression) -> Expression {
+    let token = p.cur_token.clone();
+    // TODO: should maybe be handled as an error instead.
+    let args = p.parse_call_arguements().unwrap_or(Vec::new());
+
+    Expression::CallExpression(
+        token,
+        Box::new(ExpressionStatement {
+            value: function,
+            token: Token::FUNCTION,
+        }),
+        args,
+    )
+}
+
 fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
     let infix = p.cur_token.clone();
     let precendence = p.cur_precendence();
@@ -163,6 +178,7 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
         Expression::BoolExpression(ref t) => t.clone(),
         Expression::IfExpression(ref t, _, _, _) => t.clone(),
         Expression::FunctionLiteral(ref t, _, _) => t.clone(),
+        Expression::CallExpression(ref t, _, _) => t.clone(),
     };
 
     Expression::InfixExpression((
@@ -199,6 +215,7 @@ impl Token {
             | Token::NOT_EQ
             | Token::LT
             | Token::GT => Some(parse_infix_expression),
+            Token::LPAREN => Some(parse_call_expression),
             _ => todo!(),
         }
     }

@@ -30,6 +30,7 @@ const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyC
     map.insert(Token::MINUS, ExpressionPrecendence::SUM);
     map.insert(Token::SLASH, ExpressionPrecendence::PRODUCT);
     map.insert(Token::ASTERISK, ExpressionPrecendence::PRODUCT);
+    map.insert(Token::LPAREN, ExpressionPrecendence::CALL);
 
     map
 });
@@ -38,11 +39,11 @@ pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub cur_token: Token,
     peek_token: Token,
-    errors: Vec<String>,
+    pub errors: Vec<String>,
 }
 
 impl<'a> Parser<'a> {
-    fn new(lexer: Lexer<'a>) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Parser {
             lexer,
             cur_token: Token::default(),
@@ -78,7 +79,7 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Result<Program, String> {
+    pub fn parse_program(&mut self) -> Result<Program, String> {
         let mut program = Program {
             statements: Vec::default(),
         };
@@ -161,18 +162,47 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, String> {
-        let statement = ReturnStatement {
+        let mut statement = ReturnStatement {
             token: self.cur_token.clone(),
             value: Expression::default(),
         };
 
         self.next_token();
 
-        while !self.cur_token_is(Token::SEMICOLON) {
+        statement.value = self
+            .parse_expression(ExpressionPrecendence::LOWEST)
+            .ok_or("Failed to parse expression")?;
+
+        if self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
         }
 
         Ok(Statement::ReturnStatement(statement))
+    }
+
+    pub fn parse_call_arguements(&mut self) -> Option<Vec<Expression>> {
+        let mut args = Vec::new();
+
+        if self.peek_token_is(&Token::RPAREN) {
+            self.next_token();
+            return Some(args);
+        }
+
+        self.next_token();
+        args.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+
+        while self.peek_token_is(&Token::COMMA) {
+            self.next_token();
+            self.next_token();
+
+            args.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+        }
+
+        if !self.expect_peek(Token::RPAREN) {
+            return None;
+        }
+
+        Some(args)
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -189,10 +219,16 @@ impl<'a> Parser<'a> {
         statement.name = self.cur_token.clone();
 
         if !self.expect_peek(Token::ASSIGN) {
-            return Err("Failed".to_string());
+            return Err("Failed to parse let statement".to_string());
         }
 
-        while !self.cur_token_is(Token::SEMICOLON) {
+        self.next_token();
+
+        statement.value = self
+            .parse_expression(ExpressionPrecendence::LOWEST)
+            .ok_or("failed to parse expression")?;
+
+        if self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
         }
 
@@ -265,7 +301,7 @@ impl<'a> Parser<'a> {
 mod test {
     use super::*;
     use crate::{
-        ast::{BlockStatement, Statement, TokenLiteral},
+        ast::{Statement, TokenLiteral},
         test_setup,
         token::Token,
     };
@@ -553,6 +589,15 @@ mod test {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         inputs.iter().enumerate().for_each(|(i, input)| {
@@ -706,6 +751,47 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5)";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression.value {
+                Expression::CallExpression(_, func, args) => {
+                    test_ident_expression(&func.value, "add");
+                    assert_eq!(args.len(), 3);
+                    test_int_expression(&args[0], 1);
+                    test_infix_expression(&args[1], "*", "2", "3");
+                    test_infix_expression(&args[2], "+", "4", "5");
+                }
+                _ => panic!("Expected call expression"),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    fn test_ident_expression(expression: &Expression, expected_token: &str) {
+        match expression {
+            Expression::IdentExpression(t) => {
+                assert_eq!(t.token_literal(), expected_token);
+            }
+            _ => panic!("Expected ident expression"),
+        }
+    }
+
+    fn test_int_expression(expression: &Expression, expected_token: usize) {
+        match expression {
+            Expression::IntExpression(t) => {
+                assert_eq!(t.token_literal().parse::<usize>().unwrap(), expected_token);
+            }
+            _ => panic!("Expected int expression"),
+        }
+    }
+
     fn test_infix_expression(
         expression: &Expression,
         expected_token: &str,
@@ -719,14 +805,20 @@ mod test {
                     Expression::IdentExpression(t) => {
                         assert_eq!(t.token_literal(), left_literal)
                     }
-                    _ => panic!("Expected ident expression"),
+                    Expression::IntExpression(t) => {
+                        assert_eq!(t.token_literal(), left_literal)
+                    }
+                    _ => panic!("Expected ident | int expression"),
                 }
 
                 match &right.value {
                     Expression::IdentExpression(t) => {
                         assert_eq!(t.token_literal(), right_literal)
                     }
-                    _ => panic!("Expected ident expression"),
+                    Expression::IntExpression(t) => {
+                        assert_eq!(t.token_literal(), right_literal)
+                    }
+                    _ => panic!("Expected ident | int expression"),
                 }
             }
             _ => panic!("Expected infix expression"),

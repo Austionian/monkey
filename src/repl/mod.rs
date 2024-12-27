@@ -1,4 +1,4 @@
-use crate::{lexer, token::Token};
+use crate::{lexer, parser::Parser};
 use std::{
     io::{self, Write},
     process,
@@ -17,11 +17,40 @@ pub fn start() {
         process::exit(0)
     }
 
-    let mut lexer = lexer::Lexer::new(&buffer);
+    let lexer = lexer::Lexer::new(&buffer);
+    let mut parser = Parser::new(lexer);
 
-    let mut tok = Token::default();
-    while tok != Token::EOF {
-        tok = lexer.next_token();
-        println!("out: {:?}", tok);
+    let program = parser.parse_program();
+
+    if parser.errors.len() > 0 {
+        eprintln!("{MONKEY_FACE}");
+        eprintln!("Whoops! We ran into some monkey business here!");
+        eprintln!("parser errors:");
+        for error in parser.errors {
+            eprintln!("\t{error}");
+        }
+        return;
     }
+
+    if let Ok(program) = program {
+        println!("{program}");
+    }
+    //let mut tok = Token::default();
+    //while tok != Token::EOF {
+    //    tok = lexer.next_token();
+    //    println!("out: {:?}", tok);
+    //}
 }
+
+const MONKEY_FACE: &str = r#"            __,__
+   .--.  .-"     "-.  .--.
+  / .. \/  .-. .-.  \/ .. \
+ | |  '|  /   Y   \  |'  | |
+ | \   \  \ 0 | 0 /  /   / |
+  \ '- ,\.-"""""""-./, -' /
+   ''-' /_   ^ ^   _\ '-''
+       |  \._   _./  |
+       \   \ '~' /   /
+        '._ '-=-' _.'
+           '-----'
+"#;

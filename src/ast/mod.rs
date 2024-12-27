@@ -32,6 +32,8 @@ pub enum Expression {
     ),
     // Token, idents, body
     FunctionLiteral(Token, Vec<Token>, BlockStatement),
+    // Token ie "(", function, arguments
+    CallExpression(Token, Box<ExpressionStatement>, Vec<Expression>),
     UnknownExpression(Token),
 }
 
@@ -150,6 +152,16 @@ impl Display for Expression {
                         .join(", ")
                 ));
                 buffer.push_str(body.to_string().as_str());
+            }
+            Self::CallExpression(_, func, args) => {
+                buffer.push_str(&format!(
+                    "{}({})",
+                    func.to_string(),
+                    args.iter()
+                        .map(|arg| arg.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }
