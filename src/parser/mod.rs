@@ -199,6 +199,34 @@ impl<'a> Parser<'a> {
         Ok(Statement::LetStatement(statement))
     }
 
+    pub fn parse_function_parameters(&mut self) -> Option<Vec<Token>> {
+        let mut parameters = Vec::new();
+
+        if self.peek_token_is(&Token::RPAREN) {
+            self.next_token();
+            return Some(parameters);
+        }
+
+        self.next_token();
+
+        parameters.push(self.cur_token.clone());
+
+        while self.peek_token_is(&Token::COMMA) {
+            // advance to comma
+            self.next_token();
+            // advance to the ident
+            self.next_token();
+
+            parameters.push(self.cur_token.clone());
+        }
+
+        if !self.expect_peek(Token::RPAREN) {
+            return None;
+        }
+
+        Some(parameters)
+    }
+
     pub fn peek_token_is(&self, token: &Token) -> bool {
         mem::discriminant(&self.peek_token) == mem::discriminant(token)
     }
@@ -546,18 +574,7 @@ mod test {
             Statement::ExpressStatement(expression_statement) => {
                 match &expression_statement.value {
                     Expression::IfExpression(_, conditional, consequence, alt) => {
-                        match &conditional.value {
-                            Expression::InfixExpression((t, left, right)) => {
-                                if let Expression::IdentExpression(t) = &left.value {
-                                    assert_eq!(t.token_literal(), "x");
-                                }
-                                assert_eq!(t.token_literal(), "<");
-                                if let Expression::IdentExpression(t) = &right.value {
-                                    assert_eq!(t.token_literal(), "y");
-                                }
-                            }
-                            _ => panic!("Expected an infix expression"),
-                        }
+                        test_infix_expression(&conditional.value, "<", "x", "y");
 
                         match &consequence.statements[0] {
                             Statement::ExpressStatement(exp) => match &exp.value {
@@ -578,6 +595,7 @@ mod test {
         }
     }
 
+    #[test]
     fn test_if_expression_with_else() {
         let input = "if (x < y) { x } else { y }";
 
@@ -589,6 +607,7 @@ mod test {
             Statement::ExpressStatement(expression_statement) => {
                 match &expression_statement.value {
                     Expression::IfExpression(_, conditional, consequence, alt) => {
+                        test_infix_expression(&conditional.value, "<", "x", "y");
                         match &conditional.value {
                             Expression::InfixExpression((t, left, right)) => {
                                 if let Expression::IdentExpression(t) = &left.value {
@@ -616,7 +635,7 @@ mod test {
                             match &alternative.statements[0] {
                                 Statement::ExpressStatement(exp) => match &exp.value {
                                     Expression::IdentExpression(t) => {
-                                        assert_eq!(t.token_literal(), "x");
+                                        assert_eq!(t.token_literal(), "y");
                                     }
                                     _ => panic!("Expected IdentExpression"),
                                 },
@@ -628,6 +647,89 @@ mod test {
                 }
             }
             _ => panic!("Should first be an expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_function_literal() {
+        let input = "fn(x, y) { x + y; }";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression.value {
+                Expression::FunctionLiteral(_, params, body) => {
+                    assert_eq!(params.len(), 2);
+                    if let Token::IDENT(x) = &params[0] {
+                        assert_eq!(x, "x");
+                    }
+                    if let Token::IDENT(y) = &params[1] {
+                        assert_eq!(y, "y");
+                    }
+
+                    assert_eq!(body.statements.len(), 1);
+                    match &body.statements[0] {
+                        Statement::ExpressStatement(exp) => {
+                            test_infix_expression(&exp.value, "+", "x", "y");
+                        }
+                        _ => panic!("Expected expression statement"),
+                    }
+                }
+                _ => panic!("Expected function literal"),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let inputs = vec!["fn() {};", "fn(x) {};", "fn(x, y, z) {};"];
+        let expected = vec![vec![], vec!["x"], vec!["x", "y", "z"]];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let program = test_setup!(input);
+
+            match &program.statements[0] {
+                Statement::ExpressStatement(expression) => match &expression.value {
+                    Expression::FunctionLiteral(_, params, _) => {
+                        assert_eq!(params.len(), expected[i].len());
+                        for (j, param) in params.iter().enumerate() {
+                            assert_eq!(param.token_literal(), expected[i][j])
+                        }
+                    }
+                    _ => panic!("Expected function literal"),
+                },
+                _ => panic!("Expected expression"),
+            }
+        }
+    }
+
+    fn test_infix_expression(
+        expression: &Expression,
+        expected_token: &str,
+        left_literal: &str,
+        right_literal: &str,
+    ) {
+        match expression {
+            Expression::InfixExpression((t, left, right)) => {
+                assert_eq!(t.token_literal(), expected_token);
+                match &left.value {
+                    Expression::IdentExpression(t) => {
+                        assert_eq!(t.token_literal(), left_literal)
+                    }
+                    _ => panic!("Expected ident expression"),
+                }
+
+                match &right.value {
+                    Expression::IdentExpression(t) => {
+                        assert_eq!(t.token_literal(), right_literal)
+                    }
+                    _ => panic!("Expected ident expression"),
+                }
+            }
+            _ => panic!("Expected infix expression"),
         }
     }
 }

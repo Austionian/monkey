@@ -30,6 +30,8 @@ pub enum Expression {
         Box<BlockStatement>,
         Option<Box<BlockStatement>>,
     ),
+    // Token, idents, body
+    FunctionLiteral(Token, Vec<Token>, BlockStatement),
     UnknownExpression(Token),
 }
 
@@ -136,6 +138,18 @@ impl Display for Expression {
                 if let Some(alt) = alternative {
                     buffer.push_str(&format!("else {}", alt.to_string()));
                 }
+            }
+            Self::FunctionLiteral(t, params, body) => {
+                buffer.push_str(&format!(
+                    "{} ({}) ",
+                    t.token_literal(),
+                    params
+                        .iter()
+                        .map(|p| p.token_literal())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+                buffer.push_str(body.to_string().as_str());
             }
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }

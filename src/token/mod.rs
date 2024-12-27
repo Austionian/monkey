@@ -85,6 +85,24 @@ fn parse_grouped_expression(p: &mut Parser) -> Option<Expression> {
     exp
 }
 
+fn parse_function_literal(p: &mut Parser) -> Option<Expression> {
+    let token = p.cur_token.clone();
+
+    if !p.expect_peek(Token::LPAREN) {
+        return None;
+    }
+
+    let parameters = p.parse_function_parameters()?;
+
+    if !p.expect_peek(Token::LBRACE) {
+        return None;
+    }
+
+    let body = p.parse_block_statement().ok()?;
+
+    Some(Expression::FunctionLiteral(token, parameters, body))
+}
+
 fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
     let token = p.cur_token.clone();
 
@@ -144,6 +162,7 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
         Expression::PrefixExpression((ref t, _)) => t.clone(),
         Expression::BoolExpression(ref t) => t.clone(),
         Expression::IfExpression(ref t, _, _, _) => t.clone(),
+        Expression::FunctionLiteral(ref t, _, _) => t.clone(),
     };
 
     Expression::InfixExpression((
@@ -165,6 +184,7 @@ impl Token {
             Token::TRUE | Token::FALSE => Some(parse_bool_expression),
             Token::LPAREN => Some(parse_grouped_expression),
             Token::IF => Some(parse_if_expression),
+            Token::FUNCTION => Some(parse_function_literal),
             _ => todo!(),
         }
     }
