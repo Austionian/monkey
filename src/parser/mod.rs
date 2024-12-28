@@ -297,6 +297,21 @@ impl<'a> Parser<'a> {
     }
 }
 
+pub fn check_parse_errors(p: &Parser) {
+    let errors = p.errors();
+
+    if errors.len() == 0 {
+        return;
+    }
+
+    eprintln!("parser has {} errors", errors.len());
+    for msg in errors.iter() {
+        eprintln!("parser error: {}", msg);
+    }
+
+    panic!();
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -330,21 +345,6 @@ mod test {
         }
 
         true
-    }
-
-    fn check_parse_errors(p: &Parser) {
-        let errors = p.errors();
-
-        if errors.len() == 0 {
-            return;
-        }
-
-        eprintln!("parser has {} errors", errors.len());
-        for msg in errors.iter() {
-            eprintln!("parser error: {}", msg);
-        }
-
-        panic!();
     }
 
     #[test]

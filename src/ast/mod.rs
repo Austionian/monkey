@@ -131,11 +131,7 @@ impl Display for Expression {
             }
             Self::BoolExpression(t) => buffer.push_str(&t.token_literal()),
             Self::IfExpression(_, condition, consequnce, alternative) => {
-                buffer.push_str(&format!(
-                    "if {} {}",
-                    condition.to_string(),
-                    consequnce.to_string()
-                ));
+                buffer.push_str(&format!("if {} {}", condition, consequnce));
 
                 if let Some(alt) = alternative {
                     buffer.push_str(&format!("else {}", alt.to_string()));
@@ -156,7 +152,7 @@ impl Display for Expression {
             Self::CallExpression(_, func, args) => {
                 buffer.push_str(&format!(
                     "{}({})",
-                    func.to_string(),
+                    func,
                     args.iter()
                         .map(|arg| arg.to_string())
                         .collect::<Vec<_>>()

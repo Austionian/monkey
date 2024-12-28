@@ -22,7 +22,7 @@ pub fn start() {
 
     let program = parser.parse_program();
 
-    if parser.errors.len() > 0 {
+    if !parser.errors.is_empty() {
         eprintln!("{MONKEY_FACE}");
         eprintln!("Whoops! We ran into some monkey business here!");
         eprintln!("parser errors:");

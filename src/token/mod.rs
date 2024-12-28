@@ -149,7 +149,7 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 fn parse_call_expression(p: &mut Parser, function: Expression) -> Expression {
     let token = p.cur_token.clone();
     // TODO: should maybe be handled as an error instead.
-    let args = p.parse_call_arguements().unwrap_or(Vec::new());
+    let args = p.parse_call_arguements().unwrap_or_default();
 
     Expression::CallExpression(
         token,
@@ -201,7 +201,7 @@ impl Token {
             Token::LPAREN => Some(parse_grouped_expression),
             Token::IF => Some(parse_if_expression),
             Token::FUNCTION => Some(parse_function_literal),
-            _ => todo!(),
+            _ => None,
         }
     }
 
@@ -216,7 +216,7 @@ impl Token {
             | Token::LT
             | Token::GT => Some(parse_infix_expression),
             Token::LPAREN => Some(parse_call_expression),
-            _ => todo!(),
+            _ => None,
         }
     }
 }
