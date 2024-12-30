@@ -1,4 +1,4 @@
-use crate::{lexer, parser::Parser};
+use crate::{evaluator::eval_statements, lexer, object::Object, parser::Parser};
 use std::{
     io::{self, Write},
     process,
@@ -33,7 +33,10 @@ pub fn start() {
     }
 
     if let Ok(program) = program {
-        println!("{program}");
+        let evaluated = eval_statements(&program);
+        if let Some(obj) = evaluated {
+            println!("{}", obj.inspect());
+        }
     }
     //let mut tok = Token::default();
     //while tok != Token::EOF {

@@ -7,14 +7,14 @@ pub trait TokenLiteral {
 
 struct Node {}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
     ExpressStatement(ExpressionStatement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     // Token ie prefix, Right
     PrefixExpression((Token, Box<ExpressionStatement>)),
@@ -43,26 +43,26 @@ impl Default for Expression {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Token,
     pub value: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,

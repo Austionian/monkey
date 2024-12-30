@@ -5,22 +5,38 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
+#[derive(Clone)]
 pub enum ObjectType {
-    IntegerObj,
-    BoolObj,
-    NullObj,
+    IntegerObj(Integer),
+    BoolObj(Boolean),
+    NullObj(Null),
+}
+
+impl Object for ObjectType {
+    fn r#type(&self) -> ObjectType {
+        self.clone()
+    }
+
+    fn inspect(&self) -> String {
+        match self {
+            Self::BoolObj(b) => b.inspect(),
+            Self::IntegerObj(i) => i.inspect(),
+            Self::NullObj(n) => n.inspect(),
+        }
+    }
 }
 
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ObjectType::IntegerObj => write!(f, "INTEGER"),
-            ObjectType::BoolObj => write!(f, "BOOLEAN"),
-            ObjectType::NullObj => write!(f, "NULL"),
+            ObjectType::IntegerObj(_) => write!(f, "INTEGER"),
+            ObjectType::BoolObj(_) => write!(f, "BOOLEAN"),
+            ObjectType::NullObj(_) => write!(f, "NULL"),
         }
     }
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Integer {
     pub value: f64,
 }
@@ -31,17 +47,18 @@ impl Object for Integer {
     }
 
     fn r#type(&self) -> ObjectType {
-        ObjectType::IntegerObj
+        ObjectType::IntegerObj(Integer::default())
     }
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Boolean {
-    value: bool,
+    pub value: bool,
 }
 
 impl Object for Boolean {
     fn r#type(&self) -> ObjectType {
-        ObjectType::BoolObj
+        ObjectType::BoolObj(Boolean::default())
     }
 
     fn inspect(&self) -> String {
@@ -49,11 +66,12 @@ impl Object for Boolean {
     }
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Null {}
 
 impl Object for Null {
     fn r#type(&self) -> ObjectType {
-        ObjectType::NullObj
+        ObjectType::NullObj(Null::default())
     }
 
     fn inspect(&self) -> String {
