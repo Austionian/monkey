@@ -44,6 +44,14 @@ pub fn eval(node: &Statement) -> Option<ObjectType> {
 fn eval_prefix_expression(operator: &Token, right: ObjectType) -> ObjectType {
     match operator {
         Token::BANG => eval_bang_operator(right),
+        Token::MINUS => eval_minus_prefix(right),
+        _ => NULL,
+    }
+}
+
+fn eval_minus_prefix(right: ObjectType) -> ObjectType {
+    match right {
+        ObjectType::IntegerObj(int) => ObjectType::IntegerObj(Integer { value: -int.value }),
         _ => NULL,
     }
 }
@@ -97,8 +105,8 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let input = vec!["5", "10"];
-        let expected = vec![5.0, 10.0];
+        let input = vec!["5", "10", "-5", "-10"];
+        let expected = vec![5.0, 10.0, -5.0, -10.0];
 
         for (i, v) in input.iter().enumerate() {
             let evaluated = test_eval(v).unwrap();
