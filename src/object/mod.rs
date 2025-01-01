@@ -5,7 +5,7 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ObjectType {
     IntegerObj(Integer),
     BoolObj(Boolean),
@@ -36,7 +36,7 @@ impl Display for ObjectType {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Integer {
     pub value: f64,
 }
@@ -51,7 +51,7 @@ impl Object for Integer {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -66,7 +66,7 @@ impl Object for Boolean {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Null {}
 
 impl Object for Null {
