@@ -99,8 +99,6 @@ fn parse_function_literal(p: &mut Parser) -> Option<Expression> {
 }
 
 fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
-    let token = p.cur_token.clone();
-
     if !p.expect_peek(Token::LPAREN) {
         return None;
     }
@@ -131,7 +129,6 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
     }
 
     Some(Expression::IfExpression(
-        token,
         Box::new(condition),
         Box::new(consequence),
         alternative,
@@ -139,11 +136,10 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 }
 
 fn parse_call_expression(p: &mut Parser, function: Expression) -> Expression {
-    let token = p.cur_token.clone();
     // TODO: should maybe be handled as an error instead.
     let args = p.parse_call_arguements().unwrap_or_default();
 
-    Expression::CallExpression(token, Box::new(function), args)
+    Expression::CallExpression(Box::new(function), args)
 }
 
 fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {

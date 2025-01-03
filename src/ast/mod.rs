@@ -23,7 +23,6 @@ pub enum Expression {
     BoolExpression(Token),
     // Token, condition, consequence, alternative
     IfExpression(
-        Token,
         Box<Expression>,
         Box<BlockStatement>,
         Option<Box<BlockStatement>>,
@@ -31,7 +30,7 @@ pub enum Expression {
     // Token, idents, body
     FunctionLiteral(Token, Vec<Token>, BlockStatement),
     // Token ie "(", function, arguments
-    CallExpression(Token, Box<Expression>, Vec<Expression>),
+    CallExpression(Box<Expression>, Vec<Expression>),
     UnknownExpression(Token),
 }
 
@@ -54,15 +53,8 @@ pub struct ReturnStatement {
     pub value: Expression,
 }
 
-//#[derive(Debug, Default, Clone)]
-//pub struct ExpressionStatement {
-//    pub token: Token,
-//    pub value: Expression,
-//}
-
 #[derive(Debug, Default, Clone)]
 pub struct BlockStatement {
-    pub token: Token,
     pub statements: Vec<Statement>,
 }
 
@@ -125,7 +117,7 @@ impl Display for Expression {
                 buffer.push_str(&format!("({}{})", t.0.token_literal(), t.1))
             }
             Self::BoolExpression(t) => buffer.push_str(&t.token_literal()),
-            Self::IfExpression(_, condition, consequnce, alternative) => {
+            Self::IfExpression(condition, consequnce, alternative) => {
                 buffer.push_str(&format!("if {} {}", condition, consequnce));
 
                 if let Some(alt) = alternative {
@@ -144,7 +136,7 @@ impl Display for Expression {
                 ));
                 buffer.push_str(body.to_string().as_str());
             }
-            Self::CallExpression(_, func, args) => {
+            Self::CallExpression(func, args) => {
                 buffer.push_str(&format!(
                     "{}({})",
                     func,
@@ -177,12 +169,6 @@ impl Display for ReturnStatement {
         write!(f, "{} ;", self.token.token_literal())
     }
 }
-
-//impl Display for ExpressionStatement {
-//    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//        write!(f, "{}", &self.value)
-//    }
-//}
 
 #[cfg(test)]
 mod test {

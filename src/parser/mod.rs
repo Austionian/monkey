@@ -138,7 +138,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_block_statement(&mut self) -> Result<BlockStatement, String> {
-        let token = self.cur_token.clone();
         let mut statements = Vec::new();
 
         self.next_token();
@@ -150,7 +149,7 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Ok(BlockStatement { token, statements })
+        Ok(BlockStatement { statements })
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, String> {
@@ -626,7 +625,7 @@ mod test {
 
         match &program.statements[0] {
             Statement::ExpressStatement(expression_statement) => match &expression_statement {
-                Expression::IfExpression(_, conditional, consequence, alt) => {
+                Expression::IfExpression(conditional, consequence, alt) => {
                     test_infix_expression(&conditional, "<", "x", "y");
 
                     match &consequence.statements[0] {
@@ -657,7 +656,7 @@ mod test {
 
         match &program.statements[0] {
             Statement::ExpressStatement(expression_statement) => match &expression_statement {
-                Expression::IfExpression(_, conditional, consequence, alt) => {
+                Expression::IfExpression(conditional, consequence, alt) => {
                     test_infix_expression(&conditional, "<", "x", "y");
                     match **conditional {
                         Expression::InfixExpression((ref t, ref left, ref right)) => {
@@ -766,7 +765,7 @@ mod test {
 
         match &program.statements[0] {
             Statement::ExpressStatement(expression) => match &expression {
-                Expression::CallExpression(_, func, args) => {
+                Expression::CallExpression(func, args) => {
                     test_ident_expression(&func, "add");
                     assert_eq!(args.len(), 3);
                     test_int_expression(&args[0], 1);

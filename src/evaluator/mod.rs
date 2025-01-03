@@ -65,7 +65,7 @@ pub fn eval(node: &Statement) -> ObjectType {
 
                 eval_infix_statement(t, &left, &right)
             }
-            Expression::IfExpression(_, condition, consequence, alt) => {
+            Expression::IfExpression(condition, consequence, alt) => {
                 eval_if_expression(&condition, &consequence, &alt)
             }
             _ => todo!(),
