@@ -5,13 +5,14 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq, Default, Debug)]
 pub enum ObjectType {
-    IntegerObj(Integer),
-    BoolObj(Boolean),
+    IntegerObj(f64),
+    BoolObj(bool),
     #[default]
     NullObj,
-    ReturnValueObj(ReturnValue),
+    ReturnValueObj(Box<ObjectType>),
+    ErrorObj(String),
 }
 
 impl Object for ObjectType {
@@ -21,10 +22,11 @@ impl Object for ObjectType {
 
     fn inspect(&self) -> String {
         match self {
-            Self::BoolObj(b) => b.inspect(),
-            Self::IntegerObj(i) => i.inspect(),
+            Self::BoolObj(b) => b.to_string(),
+            Self::IntegerObj(i) => i.to_string(),
             Self::NullObj => "NULL".to_string(),
             Self::ReturnValueObj(r) => r.inspect(),
+            Self::ErrorObj(e) => e.to_string(),
         }
     }
 }
@@ -36,78 +38,7 @@ impl Display for ObjectType {
             Self::BoolObj(_) => write!(f, "BOOLEAN"),
             Self::NullObj => write!(f, "NULL"),
             Self::ReturnValueObj(_) => write!(f, "RETURN"),
+            Self::ErrorObj(_) => write!(f, "ERROR"),
         }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct Integer {
-    pub value: f64,
-}
-
-impl Object for Integer {
-    fn inspect(&self) -> String {
-        format!("{}", self.value)
-    }
-
-    fn r#type(&self) -> ObjectType {
-        ObjectType::IntegerObj(Integer::default())
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Boolean {
-    pub value: bool,
-}
-
-impl Object for Boolean {
-    fn r#type(&self) -> ObjectType {
-        ObjectType::BoolObj(Boolean::default())
-    }
-
-    fn inspect(&self) -> String {
-        format!("{}", self.value)
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Null {}
-
-impl Object for Null {
-    fn r#type(&self) -> ObjectType {
-        ObjectType::NullObj
-    }
-
-    fn inspect(&self) -> String {
-        "null".to_string()
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ReturnValue {
-    pub value: Box<ObjectType>,
-}
-
-impl Debug for ReturnValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Return Value: {}", self.value)
-    }
-}
-
-impl Default for ReturnValue {
-    fn default() -> Self {
-        ReturnValue {
-            value: Box::new(ObjectType::default()),
-        }
-    }
-}
-
-impl Object for ReturnValue {
-    fn r#type(&self) -> ObjectType {
-        ObjectType::ReturnValueObj(ReturnValue::default())
-    }
-
-    fn inspect(&self) -> String {
-        format!("{}", self.value)
     }
 }

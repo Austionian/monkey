@@ -1,8 +1,5 @@
 use crate::{
-    ast::{
-        BlockStatement, Expression, ExpressionStatement, LetStatement, Program, ReturnStatement,
-        Statement,
-    },
+    ast::{BlockStatement, Expression, LetStatement, Program, ReturnStatement, Statement},
     lexer::Lexer,
     token::Token,
 };
@@ -129,12 +126,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, String> {
-        let mut statement = ExpressionStatement {
-            token: self.cur_token.clone(),
-            value: Expression::default(),
-        };
-
-        statement.value = self
+        let statement = self
             .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("No expression found")?;
 
@@ -391,7 +383,7 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(statement) => match &statement.value {
+            Statement::ExpressStatement(statement) => match &statement {
                 Expression::IdentExpression(token) => {
                     assert_eq!(&token.token_literal(), "foobar")
                 }
@@ -410,7 +402,7 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(statement) => match &statement.value {
+            Statement::ExpressStatement(statement) => match &statement {
                 Expression::IntExpression(token) => {
                     assert_eq!(&token.token_literal(), "5");
 
@@ -436,7 +428,7 @@ mod test {
             assert_eq!(program.statements.len(), 1);
 
             match &program.statements[0] {
-                Statement::ExpressStatement(statement) => match &statement.value {
+                Statement::ExpressStatement(statement) => match &statement {
                     Expression::BoolExpression(token) => {
                         assert_eq!(&token.token_literal(), expected[i]);
                     }
@@ -460,21 +452,21 @@ mod test {
             assert_eq!(program.statements.len(), 1);
 
             match &program.statements[0] {
-                Statement::ExpressStatement(statement) => match &statement.value {
+                Statement::ExpressStatement(statement) => match &statement {
                     Expression::PrefixExpression((prefix_token, int_expression)) => {
                         assert_eq!(&prefix_token.token_literal(), expected_prefix[i]);
 
-                        match int_expression.as_ref().token {
-                            Token::INT(value) => assert_eq!(value, expected_int[i]),
-                            Token::FALSE => assert_eq!(
-                                int_expression.token.token_literal(),
-                                expected_bool[i - 2]
-                            ),
-                            Token::TRUE => assert_eq!(
-                                int_expression.token.token_literal(),
-                                expected_bool[i - 2]
-                            ),
-                            _ => panic!("Only INT or Bool token expected."),
+                        match **int_expression {
+                            Expression::IntExpression(ref t) => match t {
+                                Token::INT(value) => assert_eq!(value, &expected_int[i]),
+                                _ => panic!("only ints here"),
+                            },
+                            Expression::BoolExpression(ref t) => match t {
+                                Token::FALSE => assert_eq!(t.token_literal(), expected_bool[i - 2]),
+                                Token::TRUE => assert_eq!(t.token_literal(), expected_bool[i - 2]),
+                                _ => panic!("Only Bool token expected."),
+                            },
+                            _ => panic!("Only INT"),
                         }
                     }
                     _ => panic!("Expected PrefixExpression"),
@@ -498,7 +490,7 @@ mod test {
             assert_eq!(program.statements.len(), 1);
 
             match &program.statements[0] {
-                Statement::ExpressStatement(statement) => match &statement.value {
+                Statement::ExpressStatement(statement) => match &statement {
                     Expression::InfixExpression((
                         infix_token,
                         left_expression,
@@ -506,13 +498,21 @@ mod test {
                     )) => {
                         assert_eq!(&infix_token.token_literal(), expected_infix[i]);
 
-                        match left_expression.as_ref().token {
-                            Token::INT(value) => assert_eq!(value, expected_int[i]),
+                        match **left_expression {
+                            Expression::IntExpression(ref t) => {
+                                if let Token::INT(value) = t {
+                                    assert_eq!(value, &expected_int[i]);
+                                }
+                            }
                             _ => panic!("Only INT token expected"),
                         }
 
-                        match right_expression.as_ref().token {
-                            Token::INT(value) => assert_eq!(value, expected_int[i]),
+                        match **right_expression {
+                            Expression::IntExpression(ref t) => {
+                                if let Token::INT(value) = t {
+                                    assert_eq!(value, &expected_int[i]);
+                                }
+                            }
                             _ => panic!("Only INT token expected"),
                         }
                     }
@@ -524,7 +524,8 @@ mod test {
 
         let inputs = vec!["true == true", "true != false", "true == true"];
         let expected_infix = vec!["==", "!=", "=="];
-        let expected_bool = vec!["true", "true", "true", "false", "true", "true"];
+        // first three are expected left, next three are expected right
+        let expected_bool = vec!["true", "true", "true", "true", "false", "true"];
 
         inputs.iter().enumerate().for_each(|(i, input)| {
             let program = test_setup!(input);
@@ -532,7 +533,7 @@ mod test {
             assert_eq!(program.statements.len(), 1);
 
             match &program.statements[0] {
-                Statement::ExpressStatement(statement) => match &statement.value {
+                Statement::ExpressStatement(statement) => match &statement {
                     Expression::InfixExpression((
                         infix_token,
                         left_expression,
@@ -540,18 +541,26 @@ mod test {
                     )) => {
                         assert_eq!(&infix_token.token_literal(), expected_infix[i]);
 
-                        match left_expression.as_ref().token {
-                            Token::FALSE | Token::TRUE => {
-                                assert_eq!(left_expression.token.token_literal(), expected_bool[i])
+                        if let Expression::BoolExpression(ref t) = **left_expression {
+                            match t {
+                                Token::FALSE | Token::TRUE => {
+                                    assert_eq!(t.token_literal(), expected_bool[i])
+                                }
+                                _ => panic!("Only bool token expected"),
                             }
-                            _ => panic!("Only bool token expected"),
+                        } else {
+                            panic!("Expected Bool expression")
                         }
 
-                        match right_expression.as_ref().token {
-                            Token::FALSE | Token::TRUE => {
-                                assert_eq!(left_expression.token.token_literal(), expected_bool[i])
+                        if let Expression::BoolExpression(ref t) = **right_expression {
+                            match t {
+                                Token::FALSE | Token::TRUE => {
+                                    assert_eq!(t.token_literal(), expected_bool[i + 3])
+                                }
+                                _ => panic!("Only bool token expected"),
                             }
-                            _ => panic!("Only bool token expected"),
+                        } else {
+                            panic!("Expected Bool expression")
                         }
                     }
                     _ => panic!("Expected InfixExpression"),
@@ -616,26 +625,24 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(expression_statement) => {
-                match &expression_statement.value {
-                    Expression::IfExpression(_, conditional, consequence, alt) => {
-                        test_infix_expression(&conditional.value, "<", "x", "y");
+            Statement::ExpressStatement(expression_statement) => match &expression_statement {
+                Expression::IfExpression(_, conditional, consequence, alt) => {
+                    test_infix_expression(&conditional, "<", "x", "y");
 
-                        match &consequence.statements[0] {
-                            Statement::ExpressStatement(exp) => match &exp.value {
-                                Expression::IdentExpression(t) => {
-                                    assert_eq!(t.token_literal(), "x");
-                                }
-                                _ => panic!("Expected IdentExpression"),
-                            },
-                            _ => panic!("Expected an ExpressionStatement"),
-                        }
-
-                        assert!(alt.is_none());
+                    match &consequence.statements[0] {
+                        Statement::ExpressStatement(exp) => match &exp {
+                            Expression::IdentExpression(t) => {
+                                assert_eq!(t.token_literal(), "x");
+                            }
+                            _ => panic!("Expected IdentExpression"),
+                        },
+                        _ => panic!("Expected an ExpressionStatement"),
                     }
-                    _ => panic!("Should only be an if expression"),
+
+                    assert!(alt.is_none());
                 }
-            }
+                _ => panic!("Should only be an if expression"),
+            },
             _ => panic!("Should first be an expression statement"),
         }
     }
@@ -649,48 +656,46 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(expression_statement) => {
-                match &expression_statement.value {
-                    Expression::IfExpression(_, conditional, consequence, alt) => {
-                        test_infix_expression(&conditional.value, "<", "x", "y");
-                        match &conditional.value {
-                            Expression::InfixExpression((t, left, right)) => {
-                                if let Expression::IdentExpression(t) = &left.value {
-                                    assert_eq!(t.token_literal(), "x");
-                                }
-                                assert_eq!(t.token_literal(), "<");
-                                if let Expression::IdentExpression(t) = &right.value {
-                                    assert_eq!(t.token_literal(), "y");
-                                }
+            Statement::ExpressStatement(expression_statement) => match &expression_statement {
+                Expression::IfExpression(_, conditional, consequence, alt) => {
+                    test_infix_expression(&conditional, "<", "x", "y");
+                    match **conditional {
+                        Expression::InfixExpression((ref t, ref left, ref right)) => {
+                            if let Expression::IdentExpression(ref t) = **left {
+                                assert_eq!(t.token_literal(), "x");
                             }
-                            _ => panic!("Expected an infix expression"),
+                            assert_eq!(t.token_literal(), "<");
+                            if let Expression::IdentExpression(ref t) = **right {
+                                assert_eq!(t.token_literal(), "y");
+                            }
                         }
+                        _ => panic!("Expected an infix expression"),
+                    }
 
-                        match &consequence.statements[0] {
-                            Statement::ExpressStatement(exp) => match &exp.value {
+                    match &consequence.statements[0] {
+                        Statement::ExpressStatement(exp) => match &exp {
+                            Expression::IdentExpression(t) => {
+                                assert_eq!(t.token_literal(), "x");
+                            }
+                            _ => panic!("Expected IdentExpression"),
+                        },
+                        _ => panic!("Expected an ExpressionStatement"),
+                    }
+
+                    if let Some(alternative) = alt {
+                        match &alternative.statements[0] {
+                            Statement::ExpressStatement(exp) => match &exp {
                                 Expression::IdentExpression(t) => {
-                                    assert_eq!(t.token_literal(), "x");
+                                    assert_eq!(t.token_literal(), "y");
                                 }
                                 _ => panic!("Expected IdentExpression"),
                             },
                             _ => panic!("Expected an ExpressionStatement"),
                         }
-
-                        if let Some(alternative) = alt {
-                            match &alternative.statements[0] {
-                                Statement::ExpressStatement(exp) => match &exp.value {
-                                    Expression::IdentExpression(t) => {
-                                        assert_eq!(t.token_literal(), "y");
-                                    }
-                                    _ => panic!("Expected IdentExpression"),
-                                },
-                                _ => panic!("Expected an ExpressionStatement"),
-                            }
-                        }
                     }
-                    _ => panic!("Should only be an if expression"),
                 }
-            }
+                _ => panic!("Should only be an if expression"),
+            },
             _ => panic!("Should first be an expression statement"),
         }
     }
@@ -704,7 +709,7 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(expression) => match &expression.value {
+            Statement::ExpressStatement(expression) => match &expression {
                 Expression::FunctionLiteral(_, params, body) => {
                     assert_eq!(params.len(), 2);
                     if let Token::IDENT(x) = &params[0] {
@@ -717,7 +722,7 @@ mod test {
                     assert_eq!(body.statements.len(), 1);
                     match &body.statements[0] {
                         Statement::ExpressStatement(exp) => {
-                            test_infix_expression(&exp.value, "+", "x", "y");
+                            test_infix_expression(&exp, "+", "x", "y");
                         }
                         _ => panic!("Expected expression statement"),
                     }
@@ -737,7 +742,7 @@ mod test {
             let program = test_setup!(input);
 
             match &program.statements[0] {
-                Statement::ExpressStatement(expression) => match &expression.value {
+                Statement::ExpressStatement(expression) => match &expression {
                     Expression::FunctionLiteral(_, params, _) => {
                         assert_eq!(params.len(), expected[i].len());
                         for (j, param) in params.iter().enumerate() {
@@ -760,9 +765,9 @@ mod test {
         assert_eq!(program.statements.len(), 1);
 
         match &program.statements[0] {
-            Statement::ExpressStatement(expression) => match &expression.value {
+            Statement::ExpressStatement(expression) => match &expression {
                 Expression::CallExpression(_, func, args) => {
-                    test_ident_expression(&func.value, "add");
+                    test_ident_expression(&func, "add");
                     assert_eq!(args.len(), 3);
                     test_int_expression(&args[0], 1);
                     test_infix_expression(&args[1], "*", "2", "3");
@@ -801,21 +806,21 @@ mod test {
         match expression {
             Expression::InfixExpression((t, left, right)) => {
                 assert_eq!(t.token_literal(), expected_token);
-                match &left.value {
-                    Expression::IdentExpression(t) => {
+                match **left {
+                    Expression::IdentExpression(ref t) => {
                         assert_eq!(t.token_literal(), left_literal)
                     }
-                    Expression::IntExpression(t) => {
+                    Expression::IntExpression(ref t) => {
                         assert_eq!(t.token_literal(), left_literal)
                     }
                     _ => panic!("Expected ident | int expression"),
                 }
 
-                match &right.value {
-                    Expression::IdentExpression(t) => {
+                match **right {
+                    Expression::IdentExpression(ref t) => {
                         assert_eq!(t.token_literal(), right_literal)
                     }
-                    Expression::IntExpression(t) => {
+                    Expression::IntExpression(ref t) => {
                         assert_eq!(t.token_literal(), right_literal)
                     }
                     _ => panic!("Expected ident | int expression"),

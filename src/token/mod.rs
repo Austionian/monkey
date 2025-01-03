@@ -1,7 +1,8 @@
 use crate::{
-    ast::{Expression, ExpressionStatement, TokenLiteral},
+    ast::{Expression, TokenLiteral},
     parser::{ExpressionPrecendence, Parser},
 };
+use std::fmt::Display;
 use std::{cell::LazyCell, collections::HashMap};
 
 #[allow(non_camel_case_types)]
@@ -60,13 +61,7 @@ fn parse_prefix_expression(p: &mut Parser) -> Option<Expression> {
     let prefix = p.cur_token.clone();
     p.next_token();
     let right = p.parse_expression(ExpressionPrecendence::PREFIX).unwrap();
-    Some(Expression::PrefixExpression((
-        prefix,
-        Box::new(ExpressionStatement {
-            token: p.cur_token.clone(),
-            value: right,
-        }),
-    )))
+    Some(Expression::PrefixExpression((prefix, Box::new(right))))
 }
 
 fn parse_bool_expression(p: &mut Parser) -> Option<Expression> {
@@ -137,10 +132,7 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 
     Some(Expression::IfExpression(
         token,
-        Box::new(ExpressionStatement {
-            value: condition,
-            token: Token::default(),
-        }),
+        Box::new(condition),
         Box::new(consequence),
         alternative,
     ))
@@ -151,14 +143,7 @@ fn parse_call_expression(p: &mut Parser, function: Expression) -> Expression {
     // TODO: should maybe be handled as an error instead.
     let args = p.parse_call_arguements().unwrap_or_default();
 
-    Expression::CallExpression(
-        token,
-        Box::new(ExpressionStatement {
-            value: function,
-            token: Token::FUNCTION,
-        }),
-        args,
-    )
+    Expression::CallExpression(token, Box::new(function), args)
 }
 
 fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
@@ -169,26 +154,7 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
 
     let right = p.parse_expression(precendence).unwrap();
 
-    let token = match left {
-        Expression::UnknownExpression(ref t) => t.clone(),
-        Expression::InfixExpression((ref t, _, _)) => t.clone(),
-        Expression::IntExpression(ref t) => t.clone(),
-        Expression::IdentExpression(ref t) => t.clone(),
-        Expression::PrefixExpression((ref t, _)) => t.clone(),
-        Expression::BoolExpression(ref t) => t.clone(),
-        Expression::IfExpression(ref t, _, _, _) => t.clone(),
-        Expression::FunctionLiteral(ref t, _, _) => t.clone(),
-        Expression::CallExpression(ref t, _, _) => t.clone(),
-    };
-
-    Expression::InfixExpression((
-        infix,
-        Box::new(ExpressionStatement { token, value: left }),
-        Box::new(ExpressionStatement {
-            token: p.cur_token.clone(),
-            value: right,
-        }),
-    ))
+    Expression::InfixExpression((infix, Box::new(left), Box::new(right)))
 }
 
 impl Token {
@@ -252,6 +218,12 @@ impl TokenLiteral for Token {
             Token::ELSE => "else".to_string(),
             Token::RETURN => "return".to_string(),
         }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token_literal())
     }
 }
 

@@ -1,11 +1,11 @@
 use crate::{
-    ast::{BlockStatement, Expression, ExpressionStatement, Program, Statement},
-    object::{Boolean, Integer, Object, ObjectType, ReturnValue},
+    ast::{BlockStatement, Expression, Program, Statement},
+    object::{Object, ObjectType},
     token::Token,
 };
 
-const TRUE: ObjectType = ObjectType::BoolObj(Boolean { value: true });
-const FALSE: ObjectType = ObjectType::BoolObj(Boolean { value: false });
+const TRUE: ObjectType = ObjectType::BoolObj(true);
+const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
 
 pub fn eval_program(program: &Program) -> ObjectType {
@@ -19,7 +19,10 @@ pub fn eval_statements(statements: &Vec<Statement>) -> ObjectType {
         result = eval(&statement);
 
         if let ObjectType::ReturnValueObj(value) = result {
-            return *value.value;
+            return *value;
+        }
+        if let ObjectType::ErrorObj(_) = result {
+            return result;
         }
     }
 
@@ -28,9 +31,9 @@ pub fn eval_statements(statements: &Vec<Statement>) -> ObjectType {
 
 pub fn eval(node: &Statement) -> ObjectType {
     match node {
-        Statement::ExpressStatement(expression) => match &expression.value {
+        Statement::ExpressStatement(expression) => match &expression {
             Expression::IntExpression(int) => match int {
-                Token::INT(v) => ObjectType::IntegerObj(Integer { value: *v as f64 }),
+                Token::INT(v) => ObjectType::IntegerObj(*v as f64),
                 _ => unreachable!("Only ints belong in int expressions"),
             },
             Expression::BoolExpression(bool) => match bool {
@@ -42,11 +45,24 @@ pub fn eval(node: &Statement) -> ObjectType {
                 let right = eval(&Statement::ExpressStatement(
                     *(*expression_statement).clone(),
                 ));
+
+                if is_error(&right) {
+                    return right;
+                }
+
                 eval_prefix_expression(&t, right)
             }
             Expression::InfixExpression((t, left, right)) => {
                 let left = eval(&Statement::ExpressStatement(*(*left).clone()));
+                if is_error(&left) {
+                    return left;
+                }
+
                 let right = eval(&Statement::ExpressStatement(*(*right).clone()));
+                if is_error(&right) {
+                    return right;
+                }
+
                 eval_infix_statement(t, &left, &right)
             }
             Expression::IfExpression(_, condition, consequence, alt) => {
@@ -55,17 +71,29 @@ pub fn eval(node: &Statement) -> ObjectType {
             _ => todo!(),
         },
         Statement::ReturnStatement(return_statement) => {
-            let value = eval(&Statement::ExpressStatement(ExpressionStatement {
-                token: Token::default(),
-                value: return_statement.value.clone(),
-            }));
+            let value = eval(&Statement::ExpressStatement(return_statement.value.clone()));
 
-            ObjectType::ReturnValueObj(ReturnValue {
-                value: Box::new(value),
-            })
+            if is_error(&value) {
+                return value;
+            }
+
+            ObjectType::ReturnValueObj(Box::new(value))
         }
         _ => todo!(),
     }
+}
+
+fn is_error(obj: &ObjectType) -> bool {
+    if *obj != NULL {
+        std::mem::discriminant(&obj.r#type())
+            == std::mem::discriminant(&ObjectType::ErrorObj(String::default()))
+    } else {
+        false
+    }
+}
+
+fn new_error(msg: &str) -> ObjectType {
+    ObjectType::ErrorObj(msg.to_string())
 }
 
 fn eval_block_statements(block: &BlockStatement) -> ObjectType {
@@ -74,9 +102,13 @@ fn eval_block_statements(block: &BlockStatement) -> ObjectType {
     for statement in block.statements.iter() {
         result = eval(&statement);
 
+        let result_type = std::mem::discriminant(&result);
         if result != NULL
-            && std::mem::discriminant(&result)
-                == std::mem::discriminant(&ObjectType::ReturnValueObj(ReturnValue::default()))
+            && result_type
+                == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::new(
+                    ObjectType::default(),
+                )))
+            || result_type == std::mem::discriminant(&ObjectType::ErrorObj(String::default()))
         {
             return result;
         }
@@ -86,11 +118,15 @@ fn eval_block_statements(block: &BlockStatement) -> ObjectType {
 }
 
 fn eval_if_expression(
-    conidition: &ExpressionStatement,
+    conidition: &Expression,
     consequence: &BlockStatement,
     alt: &Option<Box<BlockStatement>>,
 ) -> ObjectType {
     let c = eval(&Statement::ExpressStatement(conidition.clone()));
+
+    if is_error(&c) {
+        return c;
+    }
 
     if is_truthy(c) {
         return eval_block_statements(&consequence);
@@ -103,12 +139,21 @@ fn eval_if_expression(
 
 fn is_truthy(obj: ObjectType) -> bool {
     match obj {
-        ObjectType::NullObj | ObjectType::BoolObj(Boolean { value: false }) => false,
+        ObjectType::NullObj | ObjectType::BoolObj(false) => false,
         _ => true,
     }
 }
 
 fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) -> ObjectType {
+    if std::mem::discriminant(&right.r#type()) != std::mem::discriminant(&left.r#type()) {
+        return new_error(&format!(
+            "type mismatch: {} {} {}",
+            left.r#type(),
+            token,
+            right.r#type()
+        ));
+    }
+
     if let ObjectType::IntegerObj(int_left) = left {
         if let ObjectType::IntegerObj(int_right) = right {
             return eval_integer_infix_statement(token, int_left, int_right);
@@ -118,29 +163,26 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
     match token {
         Token::EQ => native_bool_to_bool_obj(left == right),
         Token::NOT_EQ => native_bool_to_bool_obj(left != right),
-        _ => NULL,
+        _ => new_error(&format!(
+            "unknown operator: {} {} {}",
+            left.r#type(),
+            token,
+            right.r#type()
+        )),
     }
 }
 
-fn eval_integer_infix_statement(operator: &Token, left: &Integer, right: &Integer) -> ObjectType {
+fn eval_integer_infix_statement(operator: &Token, left: &f64, right: &f64) -> ObjectType {
     match operator {
-        Token::PLUS => ObjectType::IntegerObj(Integer {
-            value: left.value + right.value,
-        }),
-        Token::MINUS => ObjectType::IntegerObj(Integer {
-            value: left.value - right.value,
-        }),
-        Token::ASTERISK => ObjectType::IntegerObj(Integer {
-            value: left.value * right.value,
-        }),
-        Token::SLASH => ObjectType::IntegerObj(Integer {
-            value: left.value / right.value,
-        }),
-        Token::LT => native_bool_to_bool_obj(left.value < right.value),
-        Token::GT => native_bool_to_bool_obj(left.value > right.value),
-        Token::EQ => native_bool_to_bool_obj(left.value == right.value),
-        Token::NOT_EQ => native_bool_to_bool_obj(left.value != right.value),
-        _ => NULL,
+        Token::PLUS => ObjectType::IntegerObj(left + right),
+        Token::MINUS => ObjectType::IntegerObj(left - right),
+        Token::ASTERISK => ObjectType::IntegerObj(left * right),
+        Token::SLASH => ObjectType::IntegerObj(left / right),
+        Token::LT => native_bool_to_bool_obj(left < right),
+        Token::GT => native_bool_to_bool_obj(left > right),
+        Token::EQ => native_bool_to_bool_obj(left == right),
+        Token::NOT_EQ => native_bool_to_bool_obj(left != right),
+        _ => new_error(&format!("unknown operator: INTEGER {} INTEGER", operator)),
     }
 }
 
@@ -148,20 +190,20 @@ fn eval_prefix_expression(operator: &Token, right: ObjectType) -> ObjectType {
     match operator {
         Token::BANG => eval_bang_operator(right),
         Token::MINUS => eval_minus_prefix(right),
-        _ => NULL,
+        _ => new_error(&format!("unknown operator: {}{}", operator, right.r#type())),
     }
 }
 
 fn eval_minus_prefix(right: ObjectType) -> ObjectType {
     match right {
-        ObjectType::IntegerObj(int) => ObjectType::IntegerObj(Integer { value: -int.value }),
-        _ => NULL,
+        ObjectType::IntegerObj(int) => ObjectType::IntegerObj(-int),
+        _ => new_error(&format!("unknown operator: -{}", right.r#type())),
     }
 }
 
 fn eval_bang_operator(right: ObjectType) -> ObjectType {
     match right {
-        ObjectType::BoolObj(Boolean { value }) => native_bool_to_bool_obj(!value),
+        ObjectType::BoolObj(value) => native_bool_to_bool_obj(!value),
         ObjectType::NullObj => TRUE,
         _ => FALSE,
     }
@@ -302,7 +344,7 @@ mod test {
         for (i, v) in inputs.iter().enumerate() {
             let evaluted = test_eval(v);
             match evaluted {
-                ObjectType::IntegerObj(int) => assert_eq!(int.value, expected[i].unwrap()),
+                ObjectType::IntegerObj(int) => assert_eq!(int, expected[i].unwrap()),
                 ObjectType::NullObj => assert!(expected[i].is_none()),
                 _ => panic!("Only expected ints or nulls"),
             }
@@ -316,18 +358,55 @@ mod test {
             "return 10; 9;",
             "return 2 * 5; 9;",
             "9; return 2 * 5; 9;",
-            "if (10 > 1) {
-if (10 > 1) {
-return 10;
-}
-return 1;
-}",
+            r#"if (10 > 1) {
+                if (10 > 1) {
+                    return 10;
+                }
+                return 1;
+            }"#,
         ];
         let expected = [10.0; 5];
 
         for (i, v) in inputs.iter().enumerate() {
             let evaluated = test_eval(v);
             test_integer_object(&evaluated, expected[i]);
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let inputs = vec![
+            "5 + true",
+            "5 + true; 5",
+            "-true",
+            "true + false",
+            "5; true + false; 5",
+            "if (10 > 1) { true + false }",
+            r#"if (10 > 1) {
+                if (10 > 1) {
+                    return true + false;
+                } 
+                return 1;
+            }"#,
+        ];
+        let expected = vec![
+            "type mismatch: INTEGER + BOOLEAN",
+            "type mismatch: INTEGER + BOOLEAN",
+            "unknown operator: -BOOLEAN",
+            "unknown operator: BOOLEAN + BOOLEAN",
+            "unknown operator: BOOLEAN + BOOLEAN",
+            "unknown operator: BOOLEAN + BOOLEAN",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ];
+
+        for (i, v) in inputs.iter().enumerate() {
+            let evaluated = test_eval(v);
+
+            if let ObjectType::ErrorObj(error) = evaluated {
+                assert_eq!(error, expected[i]);
+            } else {
+                panic!("Expect an error, got {evaluated:?}")
+            }
         }
     }
 }
