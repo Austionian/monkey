@@ -1,15 +1,17 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 pub trait Object {
     fn r#type(&self) -> ObjectType;
     fn inspect(&self) -> String;
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub enum ObjectType {
     IntegerObj(Integer),
     BoolObj(Boolean),
-    NullObj(Null),
+    #[default]
+    NullObj,
+    ReturnValueObj(ReturnValue),
 }
 
 impl Object for ObjectType {
@@ -21,7 +23,8 @@ impl Object for ObjectType {
         match self {
             Self::BoolObj(b) => b.inspect(),
             Self::IntegerObj(i) => i.inspect(),
-            Self::NullObj(n) => n.inspect(),
+            Self::NullObj => "NULL".to_string(),
+            Self::ReturnValueObj(r) => r.inspect(),
         }
     }
 }
@@ -29,9 +32,10 @@ impl Object for ObjectType {
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ObjectType::IntegerObj(_) => write!(f, "INTEGER"),
-            ObjectType::BoolObj(_) => write!(f, "BOOLEAN"),
-            ObjectType::NullObj(_) => write!(f, "NULL"),
+            Self::IntegerObj(_) => write!(f, "INTEGER"),
+            Self::BoolObj(_) => write!(f, "BOOLEAN"),
+            Self::NullObj => write!(f, "NULL"),
+            Self::ReturnValueObj(_) => write!(f, "RETURN"),
         }
     }
 }
@@ -71,10 +75,39 @@ pub struct Null {}
 
 impl Object for Null {
     fn r#type(&self) -> ObjectType {
-        ObjectType::NullObj(Null::default())
+        ObjectType::NullObj
     }
 
     fn inspect(&self) -> String {
         "null".to_string()
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct ReturnValue {
+    pub value: Box<ObjectType>,
+}
+
+impl Debug for ReturnValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Return Value: {}", self.value)
+    }
+}
+
+impl Default for ReturnValue {
+    fn default() -> Self {
+        ReturnValue {
+            value: Box::new(ObjectType::default()),
+        }
+    }
+}
+
+impl Object for ReturnValue {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::ReturnValueObj(ReturnValue::default())
+    }
+
+    fn inspect(&self) -> String {
+        format!("{}", self.value)
     }
 }

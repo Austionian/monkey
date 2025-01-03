@@ -1,48 +1,110 @@
 use crate::{
-    ast::{Expression, Program, Statement},
-    object::{Boolean, Integer, Null, ObjectType},
+    ast::{BlockStatement, Expression, ExpressionStatement, Program, Statement},
+    object::{Boolean, Integer, Object, ObjectType, ReturnValue},
     token::Token,
 };
 
 const TRUE: ObjectType = ObjectType::BoolObj(Boolean { value: true });
 const FALSE: ObjectType = ObjectType::BoolObj(Boolean { value: false });
-const NULL: ObjectType = ObjectType::NullObj(Null {});
+const NULL: ObjectType = ObjectType::NullObj;
 
-pub fn eval_statements(program: &Program) -> Option<ObjectType> {
-    let mut result = None;
-    for statement in program.statements.iter() {
+pub fn eval_program(program: &Program) -> ObjectType {
+    eval_statements(&program.statements)
+}
+
+pub fn eval_statements(statements: &Vec<Statement>) -> ObjectType {
+    let mut result = ObjectType::default();
+
+    for statement in statements {
         result = eval(&statement);
+
+        if let ObjectType::ReturnValueObj(value) = result {
+            return *value.value;
+        }
     }
 
     result
 }
 
-pub fn eval(node: &Statement) -> Option<ObjectType> {
+pub fn eval(node: &Statement) -> ObjectType {
     match node {
         Statement::ExpressStatement(expression) => match &expression.value {
             Expression::IntExpression(int) => match int {
-                Token::INT(v) => Some(ObjectType::IntegerObj(Integer { value: *v as f64 })),
+                Token::INT(v) => ObjectType::IntegerObj(Integer { value: *v as f64 }),
                 _ => unreachable!("Only ints belong in int expressions"),
             },
             Expression::BoolExpression(bool) => match bool {
-                Token::TRUE => Some(TRUE),
-                Token::FALSE => Some(FALSE),
+                Token::TRUE => TRUE,
+                Token::FALSE => FALSE,
                 _ => unreachable!("Only bools belong in bool expressions"),
             },
             Expression::PrefixExpression((t, expression_statement)) => {
                 let right = eval(&Statement::ExpressStatement(
                     *(*expression_statement).clone(),
-                ))?;
-                Some(eval_prefix_expression(&t, right))
+                ));
+                eval_prefix_expression(&t, right)
             }
             Expression::InfixExpression((t, left, right)) => {
-                let left = eval(&Statement::ExpressStatement(*(*left).clone()))?;
-                let right = eval(&Statement::ExpressStatement(*(*right).clone()))?;
-                Some(eval_infix_statement(t, &left, &right))
+                let left = eval(&Statement::ExpressStatement(*(*left).clone()));
+                let right = eval(&Statement::ExpressStatement(*(*right).clone()));
+                eval_infix_statement(t, &left, &right)
+            }
+            Expression::IfExpression(_, condition, consequence, alt) => {
+                eval_if_expression(&condition, &consequence, &alt)
             }
             _ => todo!(),
         },
+        Statement::ReturnStatement(return_statement) => {
+            let value = eval(&Statement::ExpressStatement(ExpressionStatement {
+                token: Token::default(),
+                value: return_statement.value.clone(),
+            }));
+
+            ObjectType::ReturnValueObj(ReturnValue {
+                value: Box::new(value),
+            })
+        }
         _ => todo!(),
+    }
+}
+
+fn eval_block_statements(block: &BlockStatement) -> ObjectType {
+    let mut result = ObjectType::default();
+
+    for statement in block.statements.iter() {
+        result = eval(&statement);
+
+        if result != NULL
+            && std::mem::discriminant(&result)
+                == std::mem::discriminant(&ObjectType::ReturnValueObj(ReturnValue::default()))
+        {
+            return result;
+        }
+    }
+
+    result
+}
+
+fn eval_if_expression(
+    conidition: &ExpressionStatement,
+    consequence: &BlockStatement,
+    alt: &Option<Box<BlockStatement>>,
+) -> ObjectType {
+    let c = eval(&Statement::ExpressStatement(conidition.clone()));
+
+    if is_truthy(c) {
+        return eval_block_statements(&consequence);
+    } else if let Some(a) = alt {
+        return eval_block_statements(&a);
+    } else {
+        NULL
+    }
+}
+
+fn is_truthy(obj: ObjectType) -> bool {
+    match obj {
+        ObjectType::NullObj | ObjectType::BoolObj(Boolean { value: false }) => false,
+        _ => true,
     }
 }
 
@@ -100,7 +162,7 @@ fn eval_minus_prefix(right: ObjectType) -> ObjectType {
 fn eval_bang_operator(right: ObjectType) -> ObjectType {
     match right {
         ObjectType::BoolObj(Boolean { value }) => native_bool_to_bool_obj(!value),
-        ObjectType::NullObj(_) => TRUE,
+        ObjectType::NullObj => TRUE,
         _ => FALSE,
     }
 }
@@ -122,10 +184,10 @@ mod test {
     use crate::{object::Object, parser::Parser, test_setup};
     use core::panic;
 
-    fn test_eval(input: &str) -> Option<ObjectType> {
+    fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);
 
-        eval_statements(&program)
+        eval_program(&program)
     }
 
     fn test_integer_object(object: &dyn Object, expected: f64) {
@@ -133,7 +195,7 @@ mod test {
             ObjectType::IntegerObj(_) => {
                 assert_eq!(object.inspect(), expected.to_string())
             }
-            _ => panic!("Expected integer object"),
+            _ => panic!("Expected integer object, got {}", object.r#type()),
         }
     }
 
@@ -168,7 +230,7 @@ mod test {
         ];
 
         for (i, v) in input.iter().enumerate() {
-            let evaluated = test_eval(v).unwrap();
+            let evaluated = test_eval(v);
             test_integer_object(&evaluated, expected[i]);
         }
     }
@@ -200,7 +262,7 @@ mod test {
         ];
 
         for (i, v) in inputs.iter().enumerate() {
-            let evalutated = test_eval(v).unwrap();
+            let evalutated = test_eval(v);
             test_bool_object(&evalutated, expected[i]);
         }
     }
@@ -211,8 +273,61 @@ mod test {
         let expected = vec![false, true, false, true, false, true];
 
         for (i, v) in inputs.iter().enumerate() {
-            let evaluated = test_eval(v).unwrap();
+            let evaluated = test_eval(v);
             test_bool_object(&evaluated, expected[i]);
+        }
+    }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let inputs = vec![
+            "if (true) { 10 }",
+            "if (false) { 10 }",
+            "if (1) { 10 }",
+            "if (1 < 2) { 10 }",
+            "if (1 > 2) { 10 }",
+            "if (1 < 2) { 10 } else { 20 }",
+            "if (1 > 2) { 10 } else { 20 }",
+        ];
+        let expected = vec![
+            Some(10.0),
+            None,
+            Some(10.0),
+            Some(10.0),
+            None,
+            Some(10.0),
+            Some(20.0),
+        ];
+
+        for (i, v) in inputs.iter().enumerate() {
+            let evaluted = test_eval(v);
+            match evaluted {
+                ObjectType::IntegerObj(int) => assert_eq!(int.value, expected[i].unwrap()),
+                ObjectType::NullObj => assert!(expected[i].is_none()),
+                _ => panic!("Only expected ints or nulls"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let inputs = vec![
+            "return 10;",
+            "return 10; 9;",
+            "return 2 * 5; 9;",
+            "9; return 2 * 5; 9;",
+            "if (10 > 1) {
+if (10 > 1) {
+return 10;
+}
+return 1;
+}",
+        ];
+        let expected = [10.0; 5];
+
+        for (i, v) in inputs.iter().enumerate() {
+            let evaluated = test_eval(v);
+            test_integer_object(&evaluated, expected[i]);
         }
     }
 }

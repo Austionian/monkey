@@ -1,7 +1,7 @@
-use crate::{evaluator::eval_statements, lexer, object::Object, parser::Parser};
+use crate::{evaluator::eval_program, lexer, object::Object, parser::Parser};
 use std::{
     io::{self, Write},
-    process,
+    process::{self},
 };
 
 const PROMPT: &'static str = ">> ";
@@ -33,10 +33,8 @@ pub fn start() {
     }
 
     if let Ok(program) = program {
-        let evaluated = eval_statements(&program);
-        if let Some(obj) = evaluated {
-            println!("{}", obj.inspect());
-        }
+        let evaluated = eval_program(&program);
+        println!("{}", evaluated.inspect());
     }
     //let mut tok = Token::default();
     //while tok != Token::EOF {
