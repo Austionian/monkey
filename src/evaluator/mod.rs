@@ -1,6 +1,6 @@
 use crate::{
-    ast::{BlockStatement, Expression, Program, Statement},
-    object::{Object, ObjectType},
+    ast::{BlockStatement, Expression, Program, Statement, TokenLiteral},
+    object::{Environment, Function, Object, ObjectType},
     token::Token,
 };
 
@@ -8,15 +8,15 @@ const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
 
-pub fn eval_program(program: &Program) -> ObjectType {
-    eval_statements(&program.statements)
+pub fn eval_program(program: &Program, env: &mut Environment) -> ObjectType {
+    eval_statements(&program.statements, env)
 }
 
-pub fn eval_statements(statements: &Vec<Statement>) -> ObjectType {
+pub fn eval_statements(statements: &Vec<Statement>, env: &mut Environment) -> ObjectType {
     let mut result = ObjectType::default();
 
     for statement in statements {
-        result = eval(&statement);
+        result = eval(&statement, env);
 
         if let ObjectType::ReturnValueObj(value) = result {
             return *value;
@@ -29,49 +29,14 @@ pub fn eval_statements(statements: &Vec<Statement>) -> ObjectType {
     result
 }
 
-pub fn eval(node: &Statement) -> ObjectType {
+pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
     match node {
-        Statement::ExpressStatement(expression) => match &expression {
-            Expression::IntExpression(int) => match int {
-                Token::INT(v) => ObjectType::IntegerObj(*v as f64),
-                _ => unreachable!("Only ints belong in int expressions"),
-            },
-            Expression::BoolExpression(bool) => match bool {
-                Token::TRUE => TRUE,
-                Token::FALSE => FALSE,
-                _ => unreachable!("Only bools belong in bool expressions"),
-            },
-            Expression::PrefixExpression((t, expression_statement)) => {
-                let right = eval(&Statement::ExpressStatement(
-                    *(*expression_statement).clone(),
-                ));
-
-                if is_error(&right) {
-                    return right;
-                }
-
-                eval_prefix_expression(&t, right)
-            }
-            Expression::InfixExpression((t, left, right)) => {
-                let left = eval(&Statement::ExpressStatement(*(*left).clone()));
-                if is_error(&left) {
-                    return left;
-                }
-
-                let right = eval(&Statement::ExpressStatement(*(*right).clone()));
-                if is_error(&right) {
-                    return right;
-                }
-
-                eval_infix_statement(t, &left, &right)
-            }
-            Expression::IfExpression(condition, consequence, alt) => {
-                eval_if_expression(&condition, &consequence, &alt)
-            }
-            _ => todo!(),
-        },
+        Statement::ExpressStatement(expression) => eval_expression(expression, env),
         Statement::ReturnStatement(return_statement) => {
-            let value = eval(&Statement::ExpressStatement(return_statement.value.clone()));
+            let value = eval(
+                &Statement::ExpressStatement(return_statement.value.clone()),
+                env,
+            );
 
             if is_error(&value) {
                 return value;
@@ -79,7 +44,139 @@ pub fn eval(node: &Statement) -> ObjectType {
 
             ObjectType::ReturnValueObj(Box::new(value))
         }
+        Statement::LetStatement(let_statement) => {
+            let value = eval(
+                &Statement::ExpressStatement(let_statement.value.clone()),
+                env,
+            );
+
+            if is_error(&value) {
+                return value;
+            }
+
+            env.set(&let_statement.name.token_literal(), value)
+        }
+        Statement::BlockStatement(block_statement) => eval_block_statements(block_statement, env),
+    }
+}
+
+fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType {
+    match expression {
+        Expression::IntExpression(int) => match int {
+            Token::INT(v) => ObjectType::IntegerObj(*v as f64),
+            _ => unreachable!("Only ints belong in int expressions"),
+        },
+        Expression::BoolExpression(bool) => match bool {
+            Token::TRUE => TRUE,
+            Token::FALSE => FALSE,
+            _ => unreachable!("Only bools belong in bool expressions"),
+        },
+        Expression::PrefixExpression((t, expression_statement)) => {
+            let right = eval_expression(expression_statement, env);
+
+            if is_error(&right) {
+                return right;
+            }
+
+            eval_prefix_expression(&t, right)
+        }
+        Expression::InfixExpression((t, left, right)) => {
+            let left = eval_expression(left, env);
+            if is_error(&left) {
+                return left;
+            }
+
+            let right = eval_expression(right, env);
+            if is_error(&right) {
+                return right;
+            }
+
+            eval_infix_statement(t, &left, &right)
+        }
+        Expression::IfExpression(condition, consequence, alt) => {
+            eval_if_expression(&condition, &consequence, &alt, env)
+        }
+        Expression::IdentExpression(ident) => eval_ident(&ident, env),
+        Expression::FunctionLiteral(_, parameters, body) => ObjectType::FunctionObj(Function {
+            parameters: parameters.to_vec(),
+            body: body.clone(),
+            // TODO: don't clone the env
+            inner_env: env.clone(),
+        }),
+        Expression::CallExpression(func, args) => {
+            let function = eval_expression(func, env);
+            if is_error(&function) {
+                return function;
+            }
+
+            let args = eval_expressions(args, env);
+            if args.len() == 1 && is_error(&args[0]) {
+                return args[0].clone();
+            }
+
+            apply_function(function, args, env)
+        }
         _ => todo!(),
+    }
+}
+
+fn apply_function(
+    function: ObjectType,
+    args: Vec<ObjectType>,
+    env: &mut Environment,
+) -> ObjectType {
+    match function {
+        ObjectType::FunctionObj(func) => {
+            let mut extended_env = extend_func_env(func.clone(), args, env);
+            let evaluated = eval(
+                &Statement::BlockStatement(func.body.clone()),
+                &mut extended_env,
+            );
+            unwrap_retrun_value(evaluated)
+        }
+        _ => new_error(&format!("not a function: {}", function.r#type())),
+    }
+}
+
+fn extend_func_env(func: Function, args: Vec<ObjectType>, env: &mut Environment) -> Environment {
+    let mut env = env.clone();
+    env.inner_store = Some(Box::new(func.inner_env.clone()));
+
+    for (i, param) in func.parameters.iter().enumerate() {
+        env.set(&param.token_literal(), args[i].clone());
+    }
+
+    env
+}
+
+fn unwrap_retrun_value(obj: ObjectType) -> ObjectType {
+    match obj {
+        ObjectType::ReturnValueObj(return_value) => unwrap_retrun_value(*return_value),
+        _ => obj,
+    }
+}
+
+fn eval_expressions(expressions: &Vec<Expression>, env: &mut Environment) -> Vec<ObjectType> {
+    let mut result = Vec::new();
+
+    for expression in expressions {
+        let evaluated = eval_expression(expression, env);
+        if is_error(&evaluated) {
+            return vec![evaluated];
+        }
+
+        result.push(evaluated);
+    }
+
+    result
+}
+
+fn eval_ident(token: &Token, env: &mut Environment) -> ObjectType {
+    let name = token.token_literal();
+    if let Some(value) = env.get(&name) {
+        value.clone()
+    } else {
+        new_error(&format!("identifier not found: {name}"))
     }
 }
 
@@ -96,11 +193,11 @@ fn new_error(msg: &str) -> ObjectType {
     ObjectType::ErrorObj(msg.to_string())
 }
 
-fn eval_block_statements(block: &BlockStatement) -> ObjectType {
+fn eval_block_statements(block: &BlockStatement, env: &mut Environment) -> ObjectType {
     let mut result = ObjectType::default();
 
     for statement in block.statements.iter() {
-        result = eval(&statement);
+        result = eval(&statement, env);
 
         let result_type = std::mem::discriminant(&result);
         if result != NULL
@@ -121,17 +218,18 @@ fn eval_if_expression(
     conidition: &Expression,
     consequence: &BlockStatement,
     alt: &Option<Box<BlockStatement>>,
+    env: &mut Environment,
 ) -> ObjectType {
-    let c = eval(&Statement::ExpressStatement(conidition.clone()));
+    let c = eval(&Statement::ExpressStatement(conidition.clone()), env);
 
     if is_error(&c) {
         return c;
     }
 
     if is_truthy(c) {
-        return eval_block_statements(&consequence);
+        return eval_block_statements(&consequence, env);
     } else if let Some(a) = alt {
-        return eval_block_statements(&a);
+        return eval_block_statements(&a, env);
     } else {
         NULL
     }
@@ -228,8 +326,9 @@ mod test {
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);
+        let mut env = Environment::new();
 
-        eval_program(&program)
+        eval_program(&program, &mut env)
     }
 
     fn test_integer_object(object: &dyn Object, expected: f64) {
@@ -388,6 +487,7 @@ mod test {
                 } 
                 return 1;
             }"#,
+            "foobar",
         ];
         let expected = vec![
             "type mismatch: INTEGER + BOOLEAN",
@@ -397,6 +497,7 @@ mod test {
             "unknown operator: BOOLEAN + BOOLEAN",
             "unknown operator: BOOLEAN + BOOLEAN",
             "unknown operator: BOOLEAN + BOOLEAN",
+            "identifier not found: foobar",
         ];
 
         for (i, v) in inputs.iter().enumerate() {
@@ -408,5 +509,62 @@ mod test {
                 panic!("Expect an error, got {evaluated:?}")
             }
         }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let inputs = vec![
+            "let a = 5; a;",
+            "let a = 5 * 5 - 20; a;",
+            "let a = 5; let b = a; b;",
+            "let a = 5; let b = a; let c = a + b - 5; c;",
+        ];
+
+        for v in inputs {
+            test_integer_object(&test_eval(v), 5.0);
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) { x + 2; };";
+
+        if let ObjectType::FunctionObj(func) = test_eval(&input) {
+            assert_eq!(func.parameters.len(), 1);
+            assert_eq!(func.parameters[0].token_literal(), "x");
+            assert_eq!(func.body.to_string(), "(x + 2)");
+        } else {
+            panic!("object is not a function")
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let inputs = vec![
+            "let identity = fn(x) { x; }; identity(5);",
+            "let identity = fn(x) { return x; }; identity(5);",
+            "let double = fn(x) { x * 2}; double(5);",
+            "let add = fn(x, y) { x + y; }; add(5, 5);",
+            "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+            "fn(x) { x; }(5)",
+        ];
+        let expected = vec![5.0, 5.0, 10.0, 10.0, 20.0, 5.0];
+
+        for (i, v) in inputs.iter().enumerate() {
+            test_integer_object(&test_eval(v), expected[i]);
+        }
+    }
+
+    #[test]
+    fn test_enclosures() {
+        let input = r#"
+        let newAdder = fn(x) {
+            fn(y) { x + y };
+        };
+
+        let addTwo = newAdder(2);
+        addTwo(2);"#;
+
+        test_integer_object(&test_eval(&input), 4.0);
     }
 }

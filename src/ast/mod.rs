@@ -5,14 +5,15 @@ pub trait TokenLiteral {
     fn token_literal(&self) -> String;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
     ExpressStatement(Expression),
+    BlockStatement(BlockStatement),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     // Token ie prefix, Right
     PrefixExpression((Token, Box<Expression>)),
@@ -29,7 +30,7 @@ pub enum Expression {
     ),
     // Token, idents, body
     FunctionLiteral(Token, Vec<Token>, BlockStatement),
-    // Token ie "(", function, arguments
+    // Token ie function, arguments
     CallExpression(Box<Expression>, Vec<Expression>),
     UnknownExpression(Token),
 }
@@ -40,20 +41,20 @@ impl Default for Expression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReturnStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -98,6 +99,7 @@ impl Display for Statement {
             }
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
             Self::ExpressStatement(s) => buffer.push_str(&s.to_string()),
+            Self::BlockStatement(s) => buffer.push_str(&s.to_string()),
         };
 
         write!(f, "{buffer}")

@@ -1,4 +1,9 @@
-use crate::{evaluator::eval_program, lexer, object::Object, parser::Parser};
+use crate::{
+    evaluator::eval_program,
+    lexer,
+    object::{Environment, Object},
+    parser::Parser,
+};
 use std::{
     io::{self, Write},
     process::{self},
@@ -6,7 +11,7 @@ use std::{
 
 const PROMPT: &'static str = ">> ";
 
-pub fn start() {
+pub fn start(env: &mut Environment) {
     print!("{PROMPT}");
     let _ = io::stdout().flush();
 
@@ -33,7 +38,7 @@ pub fn start() {
     }
 
     if let Ok(program) = program {
-        let evaluated = eval_program(&program);
+        let evaluated = eval_program(&program, env);
         println!("{}", evaluated.inspect());
     }
     //let mut tok = Token::default();

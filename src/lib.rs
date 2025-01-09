@@ -1,7 +1,7 @@
 mod ast;
 mod evaluator;
 mod lexer;
-mod object;
+pub mod object;
 mod parser;
 pub mod repl;
 mod token;
