@@ -14,6 +14,7 @@ pub enum Token {
     // Identifiers & literals
     IDENT(String),
     INT(usize),
+    STRING(String),
 
     // Operators
     ASSIGN,
@@ -59,6 +60,8 @@ fn parse_int(p: &mut Parser) -> Option<Expression> {
 
 fn parse_prefix_expression(p: &mut Parser) -> Option<Expression> {
     let prefix = p.cur_token.clone();
+    println!("{p:?}");
+    println!("{prefix:?}");
     p.next_token();
     let right = p.parse_expression(ExpressionPrecendence::PREFIX).unwrap();
     Some(Expression::PrefixExpression((prefix, Box::new(right))))
@@ -153,9 +156,14 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
     Expression::InfixExpression((infix, Box::new(left), Box::new(right)))
 }
 
+fn parse_string(p: &mut Parser) -> Option<Expression> {
+    Some(Expression::StringExpression(p.cur_token.clone()))
+}
+
 impl Token {
     pub fn prefix_function(&self) -> Option<fn(&mut Parser) -> Option<Expression>> {
         match self {
+            Token::STRING(_) => Some(parse_string),
             Token::IDENT(_) => Some(parse_ident),
             Token::INT(_) => Some(parse_int),
             Token::BANG | Token::MINUS => Some(parse_prefix_expression),
@@ -213,6 +221,7 @@ impl TokenLiteral for Token {
             Token::IF => "if".to_string(),
             Token::ELSE => "else".to_string(),
             Token::RETURN => "return".to_string(),
+            Token::STRING(v) => v.to_string(),
         }
     }
 }

@@ -1,8 +1,10 @@
+mod builtins;
 use crate::{
     ast::{BlockStatement, Expression, Program, Statement, TokenLiteral},
     object::{Environment, Function, Object, ObjectType},
     token::Token,
 };
+use builtins::BUILTINS;
 
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
@@ -116,6 +118,7 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
 
             apply_function(function, args, env)
         }
+        Expression::StringExpression(token) => ObjectType::StringObj(token.token_literal()),
         _ => todo!(),
     }
 }
@@ -134,6 +137,7 @@ fn apply_function(
             );
             unwrap_retrun_value(evaluated)
         }
+        ObjectType::BuiltinFunction(builtin) => builtin(args),
         _ => new_error(&format!("not a function: {}", function.r#type())),
     }
 }
@@ -174,10 +178,14 @@ fn eval_expressions(expressions: &Vec<Expression>, env: &mut Environment) -> Vec
 fn eval_ident(token: &Token, env: &mut Environment) -> ObjectType {
     let name = token.token_literal();
     if let Some(value) = env.get(&name) {
-        value.clone()
-    } else {
-        new_error(&format!("identifier not found: {name}"))
+        return value.clone();
     }
+
+    if let Some(builtin) = BUILTINS.get(name.as_str()) {
+        return ObjectType::BuiltinFunction(*builtin);
+    }
+
+    new_error(&format!("identifier not found: {name}"))
 }
 
 fn is_error(obj: &ObjectType) -> bool {
@@ -258,6 +266,12 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
         }
     }
 
+    if let ObjectType::StringObj(str_left) = left {
+        if let ObjectType::StringObj(str_right) = right {
+            return eval_string_infix_statement(token, str_left, str_right);
+        }
+    }
+
     match token {
         Token::EQ => native_bool_to_bool_obj(left == right),
         Token::NOT_EQ => native_bool_to_bool_obj(left != right),
@@ -267,6 +281,15 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
             token,
             right.r#type()
         )),
+    }
+}
+
+fn eval_string_infix_statement(operator: &Token, left: &str, right: &str) -> ObjectType {
+    match operator {
+        Token::PLUS => ObjectType::StringObj(format!("{left}{right}")),
+        Token::EQ => ObjectType::BoolObj(left == right),
+        Token::NOT_EQ => ObjectType::BoolObj(left != right),
+        _ => new_error(&format!("unknown operator: STRING {} STRING", operator)),
     }
 }
 
@@ -488,6 +511,7 @@ mod test {
                 return 1;
             }"#,
             "foobar",
+            "\"Hello\" - \"World\";",
         ];
         let expected = vec![
             "type mismatch: INTEGER + BOOLEAN",
@@ -498,6 +522,7 @@ mod test {
             "unknown operator: BOOLEAN + BOOLEAN",
             "unknown operator: BOOLEAN + BOOLEAN",
             "identifier not found: foobar",
+            "unknown operator: STRING - STRING",
         ];
 
         for (i, v) in inputs.iter().enumerate() {
@@ -566,5 +591,66 @@ mod test {
         addTwo(2);"#;
 
         test_integer_object(&test_eval(&input), 4.0);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = "\"hello world!\"";
+
+        match test_eval(input) {
+            ObjectType::StringObj(s) => {
+                assert_eq!(s, "hello world!");
+            }
+            _ => panic!("Expected string obj"),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = "\"Hello\" + \" \" + \"World!\";";
+
+        match test_eval(input) {
+            ObjectType::StringObj(s) => {
+                assert_eq!(s, "Hello World!");
+            }
+            _ => panic!("Expected string obj"),
+        }
+    }
+
+    #[test]
+    fn test_string_comparison() {
+        let input = "\"Hello\" == \"Hello\"";
+        test_bool_object(&test_eval(input), true);
+    }
+
+    #[test]
+    fn test_string_comparison_false() {
+        let input = "\"Hello\" == \"World\"";
+        test_bool_object(&test_eval(input), false);
+    }
+
+    #[test]
+    fn test_builtin_funcs() {
+        let inputs = vec![
+            "len(\"\")",
+            "len(\"four\")",
+            "len(\"hello world\")",
+            "len(1)",
+            "len(\"one\", \"two\")",
+        ];
+
+        let expected_int = [0.0, 4.0, 11.0];
+        let expected_error = [
+            "argument to `len` not supported, got INTEGER",
+            "wrong number of arguments. got=2, want=1",
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            match test_eval(input) {
+                ObjectType::IntegerObj(e) => assert_eq!(e, expected_int[i]),
+                ObjectType::ErrorObj(s) => assert_eq!(s, expected_error[i - 3]),
+                _ => unreachable!("only ints and errors expected"),
+            }
+        }
     }
 }

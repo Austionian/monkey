@@ -32,6 +32,7 @@ const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyC
     map
 });
 
+#[derive(Debug)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub cur_token: Token,
@@ -775,6 +776,24 @@ mod test {
                 _ => panic!("Expected call expression"),
             },
             _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = "\"hello world\"";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression {
+                Expression::StringExpression(t) => {
+                    assert_eq!(t.token_literal(), "hello world")
+                }
+                _ => panic!("Expected string expression"),
+            },
+            _ => panic!("Exprected a expression statement"),
         }
     }
 

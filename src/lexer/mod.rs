@@ -63,6 +63,7 @@ impl<'a> Lexer<'a> {
             '>' => Token::GT,
             '<' => Token::LT,
             '\0' => Token::EOF,
+            '"' => Token::STRING(self.read_string()),
             ch => {
                 if is_letter(ch) {
                     let literal = self.read_identifier();
@@ -79,6 +80,17 @@ impl<'a> Lexer<'a> {
 
         self.read_char();
         tok
+    }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == b'"' || self.ch == 0 {
+                break;
+            }
+        }
+        self.input[position..self.position].to_string()
     }
 
     fn read_number(&mut self) -> usize {
@@ -188,9 +200,12 @@ mod tests {
             }
 
             10 == 10;
-            10 != 9;"#;
+            10 != 9;
+            "foobar";
+            "foo bar";
+            "#;
 
-        let expected: [Token; 74] = [
+        let expected: [Token; 78] = [
             Token::LET,
             Token::IDENT("five".to_string()),
             Token::ASSIGN,
@@ -263,6 +278,10 @@ mod tests {
             Token::INT(10),
             Token::NOT_EQ,
             Token::INT(9),
+            Token::SEMICOLON,
+            Token::STRING("foobar".to_string()),
+            Token::SEMICOLON,
+            Token::STRING("foo bar".to_string()),
             Token::SEMICOLON,
             Token::EOF,
         ];

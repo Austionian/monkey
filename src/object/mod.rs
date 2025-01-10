@@ -12,6 +12,8 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
+type BuiltIns = fn(Vec<ObjectType>) -> ObjectType;
+
 #[derive(Clone, PartialEq, Default, Debug)]
 pub enum ObjectType {
     IntegerObj(f64),
@@ -21,6 +23,8 @@ pub enum ObjectType {
     ReturnValueObj(Box<ObjectType>),
     ErrorObj(String),
     FunctionObj(Function),
+    StringObj(String),
+    BuiltinFunction(BuiltIns),
 }
 
 impl Object for ObjectType {
@@ -36,6 +40,8 @@ impl Object for ObjectType {
             Self::ReturnValueObj(r) => r.inspect(),
             Self::ErrorObj(e) => e.to_string(),
             Self::FunctionObj(f) => f.to_string(),
+            Self::StringObj(s) => s.to_string(),
+            Self::BuiltinFunction(_) => "BUILTIN".to_string(),
         }
     }
 }
@@ -49,6 +55,8 @@ impl Display for ObjectType {
             Self::ReturnValueObj(_) => write!(f, "RETURN"),
             Self::ErrorObj(_) => write!(f, "ERROR"),
             Self::FunctionObj(_) => write!(f, "FUNCTION"),
+            Self::StringObj(_) => write!(f, "STRING"),
+            Self::BuiltinFunction(_) => write!(f, "BUILTIN"),
         }
     }
 }

@@ -21,6 +21,7 @@ pub enum Expression {
     InfixExpression((Token, Box<Expression>, Box<Expression>)),
     IdentExpression(Token),
     IntExpression(Token),
+    StringExpression(Token),
     BoolExpression(Token),
     // Token, condition, consequence, alternative
     IfExpression(
@@ -148,6 +149,7 @@ impl Display for Expression {
                         .join(", ")
                 ));
             }
+            Self::StringExpression(t) => buffer.push_str(&t.token_literal()),
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }
 
