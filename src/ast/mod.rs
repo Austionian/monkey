@@ -33,6 +33,9 @@ pub enum Expression {
     FunctionLiteral(Token, Vec<Token>, BlockStatement),
     // Token ie function, arguments
     CallExpression(Box<Expression>, Vec<Expression>),
+    ArrayExpression(Vec<Expression>),
+    // left, index
+    IndexExpression(Box<Expression>, Box<Expression>),
     UnknownExpression(Token),
 }
 
@@ -150,6 +153,19 @@ impl Display for Expression {
                 ));
             }
             Self::StringExpression(t) => buffer.push_str(&t.token_literal()),
+            Self::ArrayExpression(array) => {
+                buffer.push_str(&format!(
+                    "[{}]",
+                    array
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            Self::IndexExpression(left, index) => {
+                buffer.push_str(&format!("({}[{}])", left, index))
+            }
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }
 

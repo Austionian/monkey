@@ -38,6 +38,8 @@ pub enum Token {
     RPAREN,
     LBRACE,
     RBRACE,
+    LBRACKET,
+    RBRACKET,
 
     // Keywords
     #[default]
@@ -76,7 +78,7 @@ fn parse_grouped_expression(p: &mut Parser) -> Option<Expression> {
 
     let exp = p.parse_expression(ExpressionPrecendence::LOWEST);
 
-    if !p.expect_peek(Token::RPAREN) {
+    if !p.expect_peek(&Token::RPAREN) {
         return None;
     }
 
@@ -86,13 +88,13 @@ fn parse_grouped_expression(p: &mut Parser) -> Option<Expression> {
 fn parse_function_literal(p: &mut Parser) -> Option<Expression> {
     let token = p.cur_token.clone();
 
-    if !p.expect_peek(Token::LPAREN) {
+    if !p.expect_peek(&Token::LPAREN) {
         return None;
     }
 
     let parameters = p.parse_function_parameters()?;
 
-    if !p.expect_peek(Token::LBRACE) {
+    if !p.expect_peek(&Token::LBRACE) {
         return None;
     }
 
@@ -102,7 +104,7 @@ fn parse_function_literal(p: &mut Parser) -> Option<Expression> {
 }
 
 fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
-    if !p.expect_peek(Token::LPAREN) {
+    if !p.expect_peek(&Token::LPAREN) {
         return None;
     }
 
@@ -110,11 +112,11 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 
     let condition = p.parse_expression(ExpressionPrecendence::LOWEST)?;
 
-    if !p.expect_peek(Token::RPAREN) {
+    if !p.expect_peek(&Token::RPAREN) {
         return None;
     }
 
-    if !p.expect_peek(Token::LBRACE) {
+    if !p.expect_peek(&Token::LBRACE) {
         return None;
     }
 
@@ -124,7 +126,7 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
     if p.peek_token_is(&Token::ELSE) {
         p.next_token();
 
-        if !p.expect_peek(Token::LBRACE) {
+        if !p.expect_peek(&Token::LBRACE) {
             return None;
         }
 
@@ -151,13 +153,32 @@ fn parse_infix_expression(p: &mut Parser, left: Expression) -> Expression {
 
     p.next_token();
 
-    let right = p.parse_expression(precendence).unwrap();
+    let right = p.parse_expression(precendence).unwrap_or_default();
 
     Expression::InfixExpression((infix, Box::new(left), Box::new(right)))
 }
 
 fn parse_string(p: &mut Parser) -> Option<Expression> {
     Some(Expression::StringExpression(p.cur_token.clone()))
+}
+
+fn parse_array_expression(p: &mut Parser) -> Option<Expression> {
+    Some(Expression::ArrayExpression(
+        p.parse_expression_list(&Token::RBRACKET)?,
+    ))
+}
+
+fn parse_index_expression(p: &mut Parser, left: Expression) -> Expression {
+    p.next_token();
+    let index = p
+        .parse_expression(ExpressionPrecendence::LOWEST)
+        .unwrap_or_default();
+
+    if !p.expect_peek(&Token::RBRACKET) {
+        return Expression::UnknownExpression(Token::ILLEGAL("Failed to parse".to_string()));
+    }
+
+    Expression::IndexExpression(Box::new(left), Box::new(index))
 }
 
 impl Token {
@@ -171,6 +192,7 @@ impl Token {
             Token::LPAREN => Some(parse_grouped_expression),
             Token::IF => Some(parse_if_expression),
             Token::FUNCTION => Some(parse_function_literal),
+            Token::LBRACKET => Some(parse_array_expression),
             _ => None,
         }
     }
@@ -186,6 +208,7 @@ impl Token {
             | Token::LT
             | Token::GT => Some(parse_infix_expression),
             Token::LPAREN => Some(parse_call_expression),
+            Token::LBRACKET => Some(parse_index_expression),
             _ => None,
         }
     }
@@ -222,6 +245,8 @@ impl TokenLiteral for Token {
             Token::ELSE => "else".to_string(),
             Token::RETURN => "return".to_string(),
             Token::STRING(v) => v.to_string(),
+            Token::LBRACKET => "[".to_string(),
+            Token::RBRACKET => "]".to_string(),
         }
     }
 }

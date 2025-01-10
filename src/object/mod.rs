@@ -25,6 +25,7 @@ pub enum ObjectType {
     FunctionObj(Function),
     StringObj(String),
     BuiltinFunction(BuiltIns),
+    ArrayObj(Vec<ObjectType>),
 }
 
 impl Object for ObjectType {
@@ -42,6 +43,11 @@ impl Object for ObjectType {
             Self::FunctionObj(f) => f.to_string(),
             Self::StringObj(s) => s.to_string(),
             Self::BuiltinFunction(_) => "BUILTIN".to_string(),
+            Self::ArrayObj(v) => v
+                .iter()
+                .map(|item| item.inspect())
+                .collect::<Vec<_>>()
+                .join(", "),
         }
     }
 }
@@ -57,6 +63,7 @@ impl Display for ObjectType {
             Self::FunctionObj(_) => write!(f, "FUNCTION"),
             Self::StringObj(_) => write!(f, "STRING"),
             Self::BuiltinFunction(_) => write!(f, "BUILTIN"),
+            Self::ArrayObj(_) => write!(f, "ARRAY"),
         }
     }
 }

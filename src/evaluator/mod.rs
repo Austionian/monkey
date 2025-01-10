@@ -119,8 +119,45 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
             apply_function(function, args, env)
         }
         Expression::StringExpression(token) => ObjectType::StringObj(token.token_literal()),
+        Expression::ArrayExpression(array) => {
+            let elements = eval_expressions(array, env);
+            if elements.len() == 1 && is_error(&elements[0]) {
+                return elements[0].clone();
+            }
+            ObjectType::ArrayObj(elements)
+        }
+        Expression::IndexExpression(left, index) => {
+            let left = eval_expression(left, env);
+            if is_error(&left) {
+                return left;
+            }
+
+            let index = eval_expression(index, env);
+            if is_error(&index) {
+                return index;
+            }
+
+            eval_index_expression(left, index)
+        }
         _ => todo!(),
     }
+}
+
+fn eval_index_expression(left: ObjectType, index: ObjectType) -> ObjectType {
+    if let ObjectType::ArrayObj(ref array) = left {
+        if let ObjectType::IntegerObj(int) = index {
+            return eval_array_index_expression(array, int);
+        }
+    }
+    new_error(&format!("index operator not supported: {}", left.r#type()))
+}
+
+fn eval_array_index_expression(array: &Vec<ObjectType>, index: f64) -> ObjectType {
+    if index < 0.0 || index > array.len() as f64 - 1.0 {
+        return NULL;
+    }
+
+    array[index as usize].clone()
 }
 
 fn apply_function(
@@ -652,5 +689,41 @@ mod test {
                 _ => unreachable!("only ints and errors expected"),
             }
         }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        match test_eval(input) {
+            ObjectType::ArrayObj(array) => {
+                assert_eq!(array.len(), 3);
+                test_integer_object(&array[0], 1.0);
+                test_integer_object(&array[1], 4.0);
+                test_integer_object(&array[2], 6.0);
+            }
+            _ => unreachable!("expected an array obj"),
+        }
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let inputs = vec![
+            ("[1,2,3][0]", 1.0),
+            ("[1,2,3][1]", 2.0),
+            ("[1,2,3][2]", 3.0),
+        ];
+
+        for (i, v) in inputs.iter().enumerate() {
+            match test_eval(v.0) {
+                ObjectType::IntegerObj(int) => assert_eq!(int, inputs[i].1),
+                _ => unreachable!("expected an integer object"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_out_of_bounds_index() {
+        let input = "[1,2][2]";
+        assert_eq!(test_eval(input), ObjectType::NullObj)
     }
 }

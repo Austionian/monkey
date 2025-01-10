@@ -46,6 +46,8 @@ impl<'a> Lexer<'a> {
             ')' => Token::RPAREN,
             '{' => Token::LBRACE,
             '}' => Token::RBRACE,
+            '[' => Token::LBRACKET,
+            ']' => Token::RBRACKET,
             ',' => Token::COMMA,
             '+' => Token::PLUS,
             '-' => Token::MINUS,
@@ -203,9 +205,10 @@ mod tests {
             10 != 9;
             "foobar";
             "foo bar";
+            [1, 2];
             "#;
 
-        let expected: [Token; 78] = [
+        let expected = vec![
             Token::LET,
             Token::IDENT("five".to_string()),
             Token::ASSIGN,
@@ -282,6 +285,12 @@ mod tests {
             Token::STRING("foobar".to_string()),
             Token::SEMICOLON,
             Token::STRING("foo bar".to_string()),
+            Token::SEMICOLON,
+            Token::LBRACKET,
+            Token::INT(1),
+            Token::COMMA,
+            Token::INT(2),
+            Token::RBRACKET,
             Token::SEMICOLON,
             Token::EOF,
         ];

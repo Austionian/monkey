@@ -2,7 +2,7 @@ use super::new_error;
 use crate::object::{Object, ObjectType};
 use std::{cell::LazyCell, collections::HashMap};
 
-pub fn len(args: Vec<ObjectType>) -> ObjectType {
+fn len(args: Vec<ObjectType>) -> ObjectType {
     if args.len() != 1 {
         return new_error(&format!(
             "wrong number of arguments. got={}, want=1",

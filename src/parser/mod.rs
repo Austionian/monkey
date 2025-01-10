@@ -14,6 +14,7 @@ pub enum ExpressionPrecendence {
     PRODUCT = 5,
     PREFIX = 6,
     CALL = 7,
+    INDEX = 8,
 }
 
 const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyCell::new(|| {
@@ -28,6 +29,7 @@ const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyC
     map.insert(Token::SLASH, ExpressionPrecendence::PRODUCT);
     map.insert(Token::ASTERISK, ExpressionPrecendence::PRODUCT);
     map.insert(Token::LPAREN, ExpressionPrecendence::CALL);
+    map.insert(Token::LBRACKET, ExpressionPrecendence::INDEX);
 
     map
 });
@@ -173,28 +175,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_call_arguements(&mut self) -> Option<Vec<Expression>> {
-        let mut args = Vec::new();
-
-        if self.peek_token_is(&Token::RPAREN) {
-            self.next_token();
-            return Some(args);
-        }
-
-        self.next_token();
-        args.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
-
-        while self.peek_token_is(&Token::COMMA) {
-            self.next_token();
-            self.next_token();
-
-            args.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
-        }
-
-        if !self.expect_peek(Token::RPAREN) {
-            return None;
-        }
-
-        Some(args)
+        self.parse_expression_list(&Token::RPAREN)
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -204,13 +185,13 @@ impl<'a> Parser<'a> {
             value: Expression::default(),
         };
 
-        if !self.expect_peek(Token::IDENT(String::default())) {
+        if !self.expect_peek(&Token::IDENT(String::default())) {
             return Err("Failed".to_string());
         }
 
         statement.name = self.cur_token.clone();
 
-        if !self.expect_peek(Token::ASSIGN) {
+        if !self.expect_peek(&Token::ASSIGN) {
             return Err("Failed to parse let statement".to_string());
         }
 
@@ -248,7 +229,7 @@ impl<'a> Parser<'a> {
             parameters.push(self.cur_token.clone());
         }
 
-        if !self.expect_peek(Token::RPAREN) {
+        if !self.expect_peek(&Token::RPAREN) {
             return None;
         }
 
@@ -275,17 +256,41 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn expect_peek(&mut self, token: Token) -> bool {
-        if self.peek_token_is(&token) {
+    pub fn expect_peek(&mut self, token: &Token) -> bool {
+        if self.peek_token_is(token) {
             self.next_token();
             return true;
         }
-        self.peek_error(&token);
+        self.peek_error(token);
         false
     }
 
     fn cur_token_is(&self, token: Token) -> bool {
         mem::discriminant(&self.cur_token) == mem::discriminant(&token)
+    }
+
+    pub fn parse_expression_list(&mut self, end: &Token) -> Option<Vec<Expression>> {
+        let mut list = Vec::new();
+
+        if self.peek_token_is(end) {
+            self.next_token();
+            return Some(list);
+        }
+
+        self.next_token();
+        list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+
+        while self.peek_token_is(&Token::COMMA) {
+            self.next_token();
+            self.next_token();
+            list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+        }
+
+        if !self.expect_peek(end) {
+            return None;
+        }
+
+        Some(list)
     }
 }
 
@@ -607,6 +612,14 @@ mod test {
                 "add(a + b + c * d / f + g)",
                 "add((((a + b) + ((c * d) / f)) + g))",
             ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
         ];
 
         inputs.iter().enumerate().for_each(|(i, input)| {
@@ -794,6 +807,46 @@ mod test {
                 _ => panic!("Expected string expression"),
             },
             _ => panic!("Exprected a expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parsing_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression {
+                Expression::ArrayExpression(array) => {
+                    assert_eq!(array.len(), 3);
+                    test_int_expression(&array[0], 1);
+                    test_infix_expression(&array[1], "*", "2", "2");
+                    test_infix_expression(&array[2], "+", "3", "3");
+                }
+                _ => unreachable!("Expected an array expression"),
+            },
+            _ => unreachable!("Expected an expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parsing_index_expression() {
+        let input = "myArray[1 + 1];";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression {
+                Expression::IndexExpression(left, index) => {
+                    test_ident_expression(&left, "myArray");
+                    test_infix_expression(&index, "+", "1", "1");
+                }
+                _ => unreachable!("Expected an index expression, got {expression:?}"),
+            },
+            _ => unreachable!("Expreced an expression statement"),
         }
     }
 
