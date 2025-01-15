@@ -692,6 +692,56 @@ mod test {
     }
 
     #[test]
+    fn test_array_builtin_funcs() {
+        let inputs = vec![
+            "len([1,2,0])",
+            "len([])",
+            "first([3,2,1])",
+            "last([1,3,2,5])",
+        ];
+
+        let expected_int = [3.0, 0.0, 3.0, 5.0];
+
+        for (i, input) in inputs.iter().enumerate() {
+            match test_eval(input) {
+                ObjectType::IntegerObj(e) => assert_eq!(e, expected_int[i]),
+                _ => unreachable!("only ints expected"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_array_rest_builtin() {
+        let input = "rest([1,2,3,4,5])";
+
+        match test_eval(input) {
+            ObjectType::ArrayObj(array) => assert_eq!(
+                array
+                    .iter()
+                    .map(|obj| match obj {
+                        ObjectType::IntegerObj(v) => v.to_owned(),
+                        _ => unreachable!("only ints in array expected"),
+                    })
+                    .collect::<Vec<_>>(),
+                vec![2.0, 3.0, 4.0, 5.0]
+            ),
+            _ => unreachable!("only array objects expected"),
+        }
+    }
+
+    #[test]
+    fn test_array_builtin_funcs_that_return_null() {
+        let inputs = vec!["first([])", "last([])", "rest([])"];
+
+        for input in inputs {
+            match test_eval(input) {
+                ObjectType::NullObj => {}
+                _ => unreachable!("only null objects expected"),
+            }
+        }
+    }
+
+    #[test]
     fn test_array_literals() {
         let input = "[1, 2 * 2, 3 + 3]";
         match test_eval(input) {
