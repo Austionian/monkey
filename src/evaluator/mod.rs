@@ -1,10 +1,11 @@
 mod builtins;
 use crate::{
-    ast::{BlockStatement, Expression, Program, Statement, TokenLiteral},
-    object::{Environment, Function, Object, ObjectType},
+    ast::{BlockStatement, Expression, Map, Program, Statement, TokenLiteral},
+    object::{Environment, Function, HashPair, Object, ObjectType},
     token::Token,
 };
 use builtins::BUILTINS;
+use std::collections::HashMap;
 
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
@@ -139,8 +140,33 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
 
             eval_index_expression(left, index)
         }
+        Expression::HashLiteral(map) => eval_hash_literal_node(map, env),
         _ => todo!(),
     }
+}
+
+fn eval_hash_literal_node(map: &Map, env: &mut Environment) -> ObjectType {
+    let mut pairs = HashMap::new();
+    for (k, v) in map.pairs.iter() {
+        let key = eval_expression(&k, env);
+        if is_error(&key) {
+            return key;
+        }
+
+        match key.hash() {
+            Ok(hash_key) => {
+                let value = eval_expression(&v, env);
+                if is_error(&value) {
+                    return value;
+                }
+
+                pairs.insert(hash_key, HashPair { key, value });
+            }
+            Err(msg) => return new_error(&msg),
+        };
+    }
+
+    ObjectType::HashObj(pairs)
 }
 
 fn eval_index_expression(left: ObjectType, index: ObjectType) -> ObjectType {
@@ -149,7 +175,23 @@ fn eval_index_expression(left: ObjectType, index: ObjectType) -> ObjectType {
             return eval_array_index_expression(array, int);
         }
     }
+    if let ObjectType::HashObj(map) = left {
+        return eval_hash_index_expression(&map, index);
+    }
     new_error(&format!("index operator not supported: {}", left.r#type()))
+}
+
+fn eval_hash_index_expression(map: &HashMap<u64, HashPair>, index: ObjectType) -> ObjectType {
+    match index.hash() {
+        Ok(hash_key) => {
+            if let Some(v) = map.get(&hash_key) {
+                v.value.clone()
+            } else {
+                NULL
+            }
+        }
+        Err(msg) => new_error(&msg),
+    }
 }
 
 fn eval_array_index_expression(array: &Vec<ObjectType>, index: f64) -> ObjectType {
@@ -383,6 +425,7 @@ mod test {
     use crate::parser::check_parse_errors;
     use crate::{object::Object, parser::Parser, test_setup};
     use core::panic;
+    use std::fmt::write;
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);
@@ -775,5 +818,93 @@ mod test {
     fn test_out_of_bounds_index() {
         let input = "[1,2][2]";
         assert_eq!(test_eval(input), ObjectType::NullObj)
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let input = r#"
+            let two = "two";
+            {
+                "one": 10 - 9,
+                "two": 1 + 1,
+                "thr" + "ee": 6 / 2,
+                4: 4,
+                true: 5,
+                false: 6,
+            };
+        "#;
+
+        match test_eval(input) {
+            ObjectType::HashObj(map) => {
+                assert_eq!(map.len(), 6);
+                test_integer_object(
+                    &map.get(&ObjectType::StringObj("one".to_string()).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    1.0,
+                );
+                test_integer_object(
+                    &map.get(&ObjectType::StringObj("two".to_string()).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    2.0,
+                );
+                test_integer_object(
+                    &map.get(&ObjectType::StringObj("three".to_string()).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    3.0,
+                );
+                test_integer_object(
+                    &map.get(&ObjectType::IntegerObj(4.0).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    4.0,
+                );
+                test_integer_object(
+                    &map.get(&ObjectType::BoolObj(true).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    5.0,
+                );
+                test_integer_object(
+                    &map.get(&ObjectType::BoolObj(false).hash().unwrap())
+                        .unwrap()
+                        .value,
+                    6.0,
+                );
+            }
+            _ => panic!("expected hash object"),
+        }
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let input = "{\"foo\": 5}[\"foo\"];";
+        test_integer_object(&test_eval(input), 5.0);
+    }
+
+    #[test]
+    fn test_hash_index_expressions_with_bool_key() {
+        let input = "{true: 5}[true];";
+        test_integer_object(&test_eval(input), 5.0);
+    }
+
+    #[test]
+    fn test_hash_index_expressions_with_string_key() {
+        let input = "let key = \"foo\"; {\"foo\": 5}[key];";
+        test_integer_object(&test_eval(input), 5.0);
+    }
+
+    #[test]
+    fn test_hash_index_expressions_with_null() {
+        let input = "{}[\"key\"];";
+        assert_eq!(test_eval(input), ObjectType::NullObj);
+    }
+
+    #[test]
+    fn test_hash_index_expressions_with_int() {
+        let input = "{5: 5}[5];";
+        test_integer_object(&test_eval(input), 5.0);
     }
 }

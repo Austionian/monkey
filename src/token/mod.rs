@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, TokenLiteral},
+    ast::{Expression, Map, TokenLiteral},
     parser::{ExpressionPrecendence, Parser},
 };
 use std::fmt::Display;
@@ -33,6 +33,7 @@ pub enum Token {
     // Delimiters
     COMMA,
     SEMICOLON,
+    COLON,
 
     LPAREN,
     RPAREN,
@@ -181,6 +182,37 @@ fn parse_index_expression(p: &mut Parser, left: Expression) -> Expression {
     Expression::IndexExpression(Box::new(left), Box::new(index))
 }
 
+fn parse_hash_literal(p: &mut Parser) -> Option<Expression> {
+    let mut pairs = HashMap::new();
+
+    while !p.peek_token_is(&Token::RBRACE) {
+        p.next_token();
+        let key = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+
+        if !p.expect_peek(&Token::COLON) {
+            return None;
+        }
+
+        p.next_token();
+        let value = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+
+        // this is a hacky way to get around hashing the Expression
+        pairs.insert(key, value);
+
+        if !p.peek_token_is(&Token::RBRACE) && !p.expect_peek(&Token::COMMA) {
+            return None;
+        }
+    }
+
+    // when would ever not pass?
+    // this could probably just be p.next_token()
+    if !p.expect_peek(&Token::RBRACE) {
+        return None;
+    }
+
+    Some(Expression::HashLiteral(Map { pairs }))
+}
+
 impl Token {
     pub fn prefix_function(&self) -> Option<fn(&mut Parser) -> Option<Expression>> {
         match self {
@@ -193,6 +225,7 @@ impl Token {
             Token::IF => Some(parse_if_expression),
             Token::FUNCTION => Some(parse_function_literal),
             Token::LBRACKET => Some(parse_array_expression),
+            Token::LBRACE => Some(parse_hash_literal),
             _ => None,
         }
     }
@@ -247,6 +280,7 @@ impl TokenLiteral for Token {
             Token::STRING(v) => v.to_string(),
             Token::LBRACKET => "[".to_string(),
             Token::RBRACKET => "]".to_string(),
+            Token::COLON => ":".to_string(),
         }
     }
 }

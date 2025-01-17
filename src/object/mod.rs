@@ -26,6 +26,26 @@ pub enum ObjectType {
     StringObj(String),
     BuiltinFunction(BuiltIns),
     ArrayObj(Vec<ObjectType>),
+    HashObj(MapObj),
+}
+
+impl ObjectType {
+    pub fn hash(&self) -> Result<u64, String> {
+        match self {
+            ObjectType::BoolObj(bool) => Ok(*bool as u64),
+            ObjectType::StringObj(ref string) => Ok(string.chars().map(|c| c as u64).sum()),
+            ObjectType::IntegerObj(int) => Ok(*int as u64),
+            _ => Err(format!("unusable as a hash key: {}", self.r#type())),
+        }
+    }
+}
+
+pub type MapObj = HashMap<u64, HashPair>;
+
+#[derive(Clone, PartialEq, Default, Debug)]
+pub struct HashPair {
+    pub key: ObjectType,
+    pub value: ObjectType,
 }
 
 impl Object for ObjectType {
@@ -48,6 +68,13 @@ impl Object for ObjectType {
                 .map(|item| item.inspect())
                 .collect::<Vec<_>>()
                 .join(", "),
+            Self::HashObj(h) => format!(
+                "{{{}}}",
+                h.iter()
+                    .map(|(_, v)| format!("{}: {}", v.key.to_string(), v.value.to_string()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -64,6 +91,7 @@ impl Display for ObjectType {
             Self::StringObj(_) => write!(f, "STRING"),
             Self::BuiltinFunction(_) => write!(f, "BUILTIN"),
             Self::ArrayObj(_) => write!(f, "ARRAY"),
+            Self::HashObj(_) => write!(f, "HASH"),
         }
     }
 }

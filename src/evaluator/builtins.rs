@@ -78,6 +78,13 @@ fn rest(args: Vec<ObjectType>) -> ObjectType {
     }
 }
 
+fn puts(args: Vec<ObjectType>) -> ObjectType {
+    for arg in args {
+        println!("{}", arg.inspect());
+    }
+    ObjectType::NullObj
+}
+
 pub const BUILTINS: LazyCell<HashMap<&'static str, fn(Vec<ObjectType>) -> ObjectType>> =
     LazyCell::new(|| {
         let mut builtins = HashMap::new();
@@ -86,6 +93,7 @@ pub const BUILTINS: LazyCell<HashMap<&'static str, fn(Vec<ObjectType>) -> Object
         builtins.insert("first", first);
         builtins.insert("last", last);
         builtins.insert("rest", rest);
+        builtins.insert("puts", puts);
 
         builtins
     });

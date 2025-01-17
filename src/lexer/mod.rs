@@ -65,6 +65,7 @@ impl<'a> Lexer<'a> {
             '>' => Token::GT,
             '<' => Token::LT,
             '\0' => Token::EOF,
+            ':' => Token::COLON,
             '"' => Token::STRING(self.read_string()),
             ch => {
                 if is_letter(ch) {
@@ -206,6 +207,7 @@ mod tests {
             "foobar";
             "foo bar";
             [1, 2];
+            {"foo": "bar"};
             "#;
 
         let expected = vec![
@@ -291,6 +293,12 @@ mod tests {
             Token::COMMA,
             Token::INT(2),
             Token::RBRACKET,
+            Token::SEMICOLON,
+            Token::LBRACE,
+            Token::STRING("foo".to_string()),
+            Token::COLON,
+            Token::STRING("bar".to_string()),
+            Token::RBRACE,
             Token::SEMICOLON,
             Token::EOF,
         ];

@@ -1,11 +1,16 @@
 use crate::token::Token;
-use std::fmt::{Debug, Display};
+use core::panic;
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 pub trait TokenLiteral {
     fn token_literal(&self) -> String;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -13,7 +18,7 @@ pub enum Statement {
     BlockStatement(BlockStatement),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     // Token ie prefix, Right
     PrefixExpression((Token, Box<Expression>)),
@@ -36,7 +41,35 @@ pub enum Expression {
     ArrayExpression(Vec<Expression>),
     // left, index
     IndexExpression(Box<Expression>, Box<Expression>),
+    HashLiteral(Map),
     UnknownExpression(Token),
+}
+
+#[derive(Debug, Clone, Eq)]
+pub struct Map {
+    pub pairs: HashMap<Expression, Expression>,
+}
+
+impl Hash for Expression {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Expression::StringExpression(t) => t.hash(state),
+            Expression::BoolExpression(t) => t.hash(state),
+            Expression::IntExpression(t) => t.hash(state),
+            Expression::InfixExpression(t) => t.0.hash(state),
+            _ => panic!("not allowed, {}", self.to_string()),
+        };
+    }
+}
+
+impl PartialEq for Map {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        todo!()
+    }
 }
 
 impl Default for Expression {
@@ -45,20 +78,20 @@ impl Default for Expression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReturnStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -165,6 +198,15 @@ impl Display for Expression {
             }
             Self::IndexExpression(left, index) => {
                 buffer.push_str(&format!("({}[{}])", left, index))
+            }
+            Self::HashLiteral(map) => {
+                buffer.push_str(&format!(
+                    "{{{}}}",
+                    map.pairs
+                        .iter()
+                        .map(|(k, v)| format!("{k}: {v},"))
+                        .collect::<String>()
+                ));
             }
             Self::UnknownExpression(t) => buffer.push_str(&t.token_literal()),
         }

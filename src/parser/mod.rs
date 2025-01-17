@@ -850,6 +850,51 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_parsing_hash_literal() {
+        let input = "{\"one\": 1, \"two\": 2, \"three\": 3};";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        let mut expected = HashMap::new();
+
+        expected.insert("one", 1);
+        expected.insert("two", 2);
+        expected.insert("three", 3);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match &expression {
+                Expression::HashLiteral(map) => {
+                    assert_eq!(map.pairs.len(), 3);
+                    //for (k, v) in map.pairs.iter() {
+                    //    let key = k.clone().to_owned();
+                    //    let expected_value = expected.get(&key).unwrap();
+                    //    test_int_expression(v, *expected_value);
+                    //}
+                }
+                _ => panic!("expected hash literal"),
+            },
+            _ => panic!("expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parsing_empty_hash_literal() {
+        let input = "{};";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match expression {
+                Expression::HashLiteral(map) => assert_eq!(map.pairs.len(), 0),
+                _ => panic!("expected hash literal"),
+            },
+            _ => panic!("expected expression statement"),
+        }
+    }
+
     fn test_ident_expression(expression: &Expression, expected_token: &str) {
         match expression {
             Expression::IdentExpression(t) => {
