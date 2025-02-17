@@ -8,7 +8,7 @@ use std::{
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
-const OP_CONSTANT: Opcode = 0;
+pub const OP_CONSTANT: Opcode = 0;
 
 #[derive(Clone)]
 struct Definition {
@@ -34,7 +34,7 @@ fn look_up(op: &Opcode) -> Option<Definition> {
     DEFINITIONS.get(op).cloned()
 }
 
-fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
+pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
     if let Some(def) = DEFINITIONS.get(op) {
         let mut instruction_len = 1;
 
