@@ -65,18 +65,18 @@ pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
     }
 }
 
-fn read_u16(ins: Vec<u8>) -> u16 {
+fn read_u16(ins: &[u8]) -> u16 {
     let arr: [u8; 2] = ins.try_into().unwrap();
     u16::from_be_bytes(arr)
 }
 
-pub fn read_operands(def: &Definition, ins: Instructions) -> (Vec<u16>, usize) {
+pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<u16>, usize) {
     let mut operands = vec![0u16; def.operand_widths.len()];
     let mut offset = 0;
 
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
-            2 => operands[i] = read_u16(ins[offset..offset + *width as usize].to_vec()),
+            2 => operands[i] = read_u16(&ins[offset..offset + *width as usize]),
             _ => todo!(),
         };
 
@@ -93,7 +93,8 @@ fn instruction_to_string(ins: &Instructions) -> String {
     while i < ins.len() {
         let def = look_up(&ins[i]).unwrap();
 
-        let (operands, read) = read_operands(&def, ins[i + 1..].to_vec());
+        println!("{i}");
+        let (operands, read) = read_operands(&def, &ins[i + 1..]);
 
         out.push_str(&format!(
             "{:04} {}\n",
@@ -123,6 +124,7 @@ fn format_instruction(def: &Definition, operands: Vec<u16>) -> Result<String, St
 #[cfg(test)]
 mod test {
     use super::*;
+    use core::panic;
 
     struct Test {
         op: Opcode,
@@ -189,7 +191,7 @@ mod test {
             let instruction = make(&t.op, t.operands.clone());
             let def = look_up(&t.op).unwrap();
 
-            let (operands_read, n) = read_operands(&def, instruction[1..].to_vec());
+            let (operands_read, n) = read_operands(&def, &instruction[1..]);
             assert_eq!(n, t.bytes_read);
 
             for (i, want) in t.operands.iter().enumerate() {
