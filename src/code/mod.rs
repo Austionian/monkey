@@ -67,6 +67,7 @@ pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
 
 fn read_u16(ins: &[u8]) -> u16 {
     let arr: [u8; 2] = ins.try_into().unwrap();
+    15u16.to_be();
     u16::from_be_bytes(arr)
 }
 
@@ -93,7 +94,6 @@ fn instruction_to_string(ins: &Instructions) -> String {
     while i < ins.len() {
         let def = look_up(&ins[i]).unwrap();
 
-        println!("{i}");
         let (operands, read) = read_operands(&def, &ins[i + 1..]);
 
         out.push_str(&format!(
