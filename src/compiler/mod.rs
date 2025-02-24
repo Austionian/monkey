@@ -1,8 +1,7 @@
 use crate::{
     ast,
     code::{self, Opcode, OP_CONSTANT},
-    object::{self, ObjectType},
-    token,
+    object,
 };
 
 struct Compiler {
@@ -70,6 +69,7 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: &Opcode, operands: Vec<usize>) -> usize {
+        // TODO: remove this map, or how this mapping be done when it gets here?
         let mut ins = code::make(op, operands.iter().map(|x| *x as u16));
         self.add_instruction(&mut ins)
     }
@@ -161,8 +161,8 @@ mod test {
             input: "1 + 2".to_string(),
             expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
             expected_instructions: vec![
-                code::make(&code::OP_CONSTANT, vec![0]),
-                code::make(&code::OP_CONSTANT, vec![1]),
+                code::make(&code::OP_CONSTANT, vec![0u16]),
+                code::make(&code::OP_CONSTANT, vec![1u16]),
             ],
         }];
 

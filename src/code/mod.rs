@@ -34,7 +34,56 @@ fn look_up(op: &Opcode) -> Option<Definition> {
     DEFINITIONS.get(op).cloned()
 }
 
-pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
+pub trait Fixed {
+    type Bytes;
+
+    fn to_be_bytes(&self) -> Self::Bytes;
+}
+
+impl Fixed for u8 {
+    type Bytes = [u8; 1];
+
+    fn to_be_bytes(&self) -> Self::Bytes {
+        u8::to_be_bytes(*self)
+    }
+}
+
+impl Fixed for u16 {
+    type Bytes = [u8; 2];
+
+    fn to_be_bytes(&self) -> Self::Bytes {
+        u16::to_be_bytes(*self)
+    }
+}
+
+impl Fixed for u32 {
+    type Bytes = [u8; 4];
+
+    fn to_be_bytes(&self) -> Self::Bytes {
+        u32::to_be_bytes(*self)
+    }
+}
+
+impl Fixed for u64 {
+    type Bytes = [u8; 8];
+
+    fn to_be_bytes(&self) -> Self::Bytes {
+        u64::to_be_bytes(*self)
+    }
+}
+
+impl Fixed for usize {
+    type Bytes = [u8; 8];
+
+    fn to_be_bytes(&self) -> Self::Bytes {
+        usize::to_be_bytes(*self)
+    }
+}
+
+pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
+    op: &Opcode,
+    operands: impl IntoIterator<Item = T>,
+) -> Vec<u8> {
     if let Some(def) = DEFINITIONS.get(op) {
         let mut instruction_len = 1;
 
@@ -48,14 +97,10 @@ pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
         let mut offset = 1;
         for (i, o) in operands.into_iter().enumerate() {
             let width = def.operand_widths[i];
-            match width {
-                2 => {
-                    let mut cursor = Cursor::new(&mut instruction);
-                    cursor.seek_relative(offset as i64).unwrap();
-                    cursor.write(&o.to_be_bytes()).unwrap();
-                }
-                _ => todo!(),
-            }
+            let mut cursor = Cursor::new(&mut instruction);
+            cursor.seek_relative(offset as i64).unwrap();
+            cursor.write(&o.to_be_bytes()).unwrap();
+
             offset += width;
         }
 
@@ -152,9 +197,9 @@ mod test {
     #[test]
     fn test_instructions_string() {
         let instructions: Vec<Instructions> = vec![
-            make(&OP_CONSTANT, vec![1]),
-            make(&OP_CONSTANT, vec![2]),
-            make(&OP_CONSTANT, vec![65535]),
+            make(&OP_CONSTANT, vec![1u16]),
+            make(&OP_CONSTANT, vec![2u16]),
+            make(&OP_CONSTANT, vec![65535u16]),
         ];
 
         let expected = r#"0000 OpConstant 1
