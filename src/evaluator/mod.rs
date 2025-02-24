@@ -36,10 +36,7 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
     match node {
         Statement::ExpressStatement(expression) => eval_expression(expression, env),
         Statement::ReturnStatement(return_statement) => {
-            let value = eval(
-                &Statement::ExpressStatement(return_statement.value.clone()),
-                env,
-            );
+            let value = eval_expression(&return_statement.value, env);
 
             if is_error(&value) {
                 return value;
@@ -48,10 +45,7 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
             ObjectType::ReturnValueObj(Box::new(value))
         }
         Statement::LetStatement(let_statement) => {
-            let value = eval(
-                &Statement::ExpressStatement(let_statement.value.clone()),
-                env,
-            );
+            let value = eval_expression(&let_statement.value, env);
 
             if is_error(&value) {
                 return value;
@@ -65,15 +59,8 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
 
 fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType {
     match expression {
-        Expression::IntExpression(int) => match int {
-            Token::INT(v) => ObjectType::IntegerObj(*v as f64),
-            _ => unreachable!("Only ints belong in int expressions"),
-        },
-        Expression::BoolExpression(bool) => match bool {
-            Token::TRUE => TRUE,
-            Token::FALSE => FALSE,
-            _ => unreachable!("Only bools belong in bool expressions"),
-        },
+        Expression::IntExpression(int) => int.to_owned().into(),
+        Expression::BoolExpression(bool) => bool.to_owned().into(),
         Expression::PrefixExpression((t, expression_statement)) => {
             let right = eval_expression(expression_statement, env);
 

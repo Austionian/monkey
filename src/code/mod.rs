@@ -67,7 +67,6 @@ pub fn make(op: &Opcode, operands: impl IntoIterator<Item = u16>) -> Vec<u8> {
 
 fn read_u16(ins: &[u8]) -> u16 {
     let arr: [u8; 2] = ins.try_into().unwrap();
-    15u16.to_be();
     u16::from_be_bytes(arr)
 }
 
@@ -124,7 +123,6 @@ fn format_instruction(def: &Definition, operands: Vec<u16>) -> Result<String, St
 #[cfg(test)]
 mod test {
     use super::*;
-    use core::panic;
 
     struct Test {
         op: Opcode,

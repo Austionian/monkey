@@ -40,6 +40,17 @@ impl ObjectType {
     }
 }
 
+impl From<Token> for ObjectType {
+    fn from(value: Token) -> Self {
+        match value {
+            Token::INT(t) => Self::IntegerObj(t as f64),
+            Token::FALSE => Self::BoolObj(false),
+            Token::TRUE => Self::BoolObj(true),
+            _ => todo!(),
+        }
+    }
+}
+
 pub type MapObj = HashMap<u64, HashPair>;
 
 #[derive(Clone, PartialEq, Default, Debug)]

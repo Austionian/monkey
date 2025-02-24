@@ -1,7 +1,8 @@
 use crate::{
     ast,
     code::{self, Opcode, OP_CONSTANT},
-    object, token,
+    object::{self, ObjectType},
+    token,
 };
 
 struct Compiler {
@@ -49,11 +50,7 @@ impl Compiler {
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompilerError> {
         match expression {
             ast::Expression::IntExpression(t) => {
-                let integer = match t {
-                    token::Token::INT(t) => object::ObjectType::IntegerObj(*t as f64),
-                    _ => unreachable!("only int tokens should be in int expressions!"),
-                };
-
+                let integer = t.to_owned().into();
                 let i = self.add_constant(integer);
                 let _ = self.emit(&OP_CONSTANT, vec![i]);
             }
