@@ -16,7 +16,7 @@ pub struct Definition {
     pub operand_widths: Vec<u16>,
 }
 
-const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| {
+pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| {
     let mut definitions = HashMap::new();
 
     definitions.insert(
@@ -110,8 +110,9 @@ pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
     }
 }
 
-fn read_u16(ins: &[u8]) -> u16 {
-    let arr: [u8; 2] = ins.try_into().unwrap();
+pub fn read_u16(ins: &[u8]) -> u16 {
+    println!("{ins:?}");
+    let arr: [u8; 2] = ins[0..2].try_into().unwrap();
     u16::from_be_bytes(arr)
 }
 

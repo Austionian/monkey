@@ -1,32 +1,33 @@
 use crate::{
     ast,
-    code::{self, Opcode, OP_CONSTANT},
+    code::{self, Opcode, DEFINITIONS, OP_CONSTANT},
     object,
 };
 
-struct Compiler {
-    instructions: code::Instructions,
-    constants: Vec<object::ObjectType>,
+pub struct Compiler {
+    pub instructions: code::Instructions,
+    pub constants: Vec<object::ObjectType>,
 }
 
-type ByteCode = Compiler;
+pub type ByteCode = Compiler;
 
-struct CompilerError {}
+#[derive(Debug)]
+pub struct CompilerError {}
 
 impl Compiler {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             instructions: Vec::new(),
             constants: Vec::new(),
         }
     }
 
-    fn compile(mut self, node: ast::Program) -> Result<Self, CompilerError> {
+    pub fn compile(&mut self, node: ast::Program) -> Result<(), CompilerError> {
         for statement in node.statements {
             self.compile_statement(statement)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     fn compile_statement(&mut self, statement: ast::Statement) -> Result<(), CompilerError> {
@@ -69,8 +70,20 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: &Opcode, operands: Vec<usize>) -> usize {
-        // TODO: remove this map, or how this mapping be done when it gets here?
-        let mut ins = code::make(op, operands.iter().map(|x| *x as u16));
+        // TODO: this still doesn't make sense, why a vec of ops
+        let mut ins: Vec<u8> = vec![];
+        if let Some(def) = DEFINITIONS.get(op) {
+            for width in def.operand_widths.iter() {
+                match width {
+                    2 => {
+                        ins = code::make(op, operands.iter().map(|x| *x as u16));
+                    }
+                    _ => todo!(),
+                };
+            }
+        } else {
+            panic!("Opcode not found!");
+        }
         self.add_instruction(&mut ins)
     }
 
@@ -85,7 +98,7 @@ impl Compiler {
         todo!()
     }
 
-    fn bytecode(self) -> ByteCode {
+    pub fn bytecode(self) -> ByteCode {
         ByteCode {
             instructions: self.instructions,
             constants: self.constants,
@@ -144,14 +157,11 @@ mod test {
     fn run_compiler_tests(tests: Vec<CompilerTestCase>) {
         for test in tests {
             let program = test_setup!(&test.input);
-            let compiler = Compiler::new();
+            let mut compiler = Compiler::new();
+            compiler.compile(program).unwrap();
 
-            if let Ok(bytecode) = compiler.compile(program) {
-                test_instructions(test.expected_instructions, bytecode.instructions);
-                test_constants(test.expected_constants, bytecode.constants);
-            } else {
-                panic!("expected the program to compile to bytecode");
-            }
+            test_instructions(test.expected_instructions, compiler.instructions);
+            test_constants(test.expected_constants, compiler.constants);
         }
     }
 
