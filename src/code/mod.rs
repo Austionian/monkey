@@ -8,12 +8,14 @@ use std::{
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
+pub const EMPTY: [u8; 0] = [];
 pub const OP_CONSTANT: Opcode = 0;
+pub const OP_ADD: Opcode = 1;
 
 #[derive(Clone)]
 pub struct Definition {
     pub name: &'static str,
-    pub operand_widths: Vec<u16>,
+    pub operand_widths: Vec<u8>,
 }
 
 pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| {
@@ -24,6 +26,14 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
         Definition {
             name: "OpConstant",
             operand_widths: vec![2],
+        },
+    );
+
+    definitions.insert(
+        OP_ADD,
+        Definition {
+            name: "OpAdd",
+            operand_widths: vec![],
         },
     );
 
@@ -111,7 +121,6 @@ pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
 }
 
 pub fn read_u16(ins: &[u8]) -> u16 {
-    println!("{ins:?}");
     let arr: [u8; 2] = ins[0..2].try_into().unwrap();
     u16::from_be_bytes(arr)
 }
@@ -132,7 +141,7 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<u16>, usize) {
     (operands, offset.into())
 }
 
-fn instruction_to_string(ins: &Instructions) -> String {
+pub fn instruction_to_string(ins: &Instructions) -> String {
     let mut out = String::new();
 
     let mut i = 0;
@@ -161,6 +170,7 @@ fn format_instruction(def: &Definition, operands: Vec<u16>) -> Result<String, St
     }
 
     match operand_count {
+        0 => Ok(format!("{}", def.name)),
         1 => Ok(format!("{} {}", def.name, operands[0])),
         _ => todo!(),
     }
@@ -178,11 +188,18 @@ mod test {
 
     #[test]
     fn test_make() {
-        let tests = vec![Test {
-            op: OP_CONSTANT,
-            operands: vec![65534],
-            expected: vec![OP_CONSTANT, 255, 254],
-        }];
+        let tests = vec![
+            Test {
+                op: OP_CONSTANT,
+                operands: vec![65534],
+                expected: vec![OP_CONSTANT, 255, 254],
+            },
+            Test {
+                op: OP_ADD,
+                operands: vec![],
+                expected: vec![OP_ADD],
+            },
+        ];
 
         for test in tests {
             let instruction = make(&test.op, test.operands);
@@ -197,15 +214,16 @@ mod test {
 
     #[test]
     fn test_instructions_string() {
+        let op_add: Vec<u8> = vec![];
         let instructions: Vec<Instructions> = vec![
-            make(&OP_CONSTANT, vec![1u16]),
+            make(&OP_ADD, op_add),
             make(&OP_CONSTANT, vec![2u16]),
             make(&OP_CONSTANT, vec![65535u16]),
         ];
 
-        let expected = r#"0000 OpConstant 1
-0003 OpConstant 2
-0006 OpConstant 65535
+        let expected = r#"0000 OpAdd
+0001 OpConstant 2
+0004 OpConstant 65535
 "#;
 
         let concated = instructions

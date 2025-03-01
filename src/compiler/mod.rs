@@ -1,7 +1,8 @@
 use crate::{
     ast,
-    code::{self, Opcode, DEFINITIONS, OP_CONSTANT},
+    code::{self, Opcode, DEFINITIONS, EMPTY, OP_CONSTANT},
     object,
+    token::Token,
 };
 
 pub struct Compiler {
@@ -54,9 +55,14 @@ impl Compiler {
                 let i = self.add_constant(integer);
                 let _ = self.emit(&OP_CONSTANT, vec![i]);
             }
-            ast::Expression::InfixExpression((_, left, right)) => {
+            ast::Expression::InfixExpression((operator, left, right)) => {
                 self.compile_expression(left.as_ref())?;
                 self.compile_expression(right.as_ref())?;
+
+                match operator {
+                    Token::PLUS => self.emit(&code::OP_ADD, vec![]),
+                    _ => todo!(),
+                };
             }
             _ => todo!(),
         }
@@ -73,6 +79,9 @@ impl Compiler {
         // TODO: this still doesn't make sense, why a vec of ops
         let mut ins: Vec<u8> = vec![];
         if let Some(def) = DEFINITIONS.get(op) {
+            if def.name == "OpAdd" {
+                self.add_instruction(&mut vec![1]);
+            }
             for width in def.operand_widths.iter() {
                 match width {
                     2 => {
@@ -109,7 +118,7 @@ impl Compiler {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{lexer::Lexer, parser::Parser, test_setup};
+    use crate::{code::instruction_to_string, lexer::Lexer, parser::Parser, test_setup};
     use core::panic;
     use object::ObjectType;
 
@@ -130,7 +139,10 @@ mod test {
     fn test_instructions(expected: Vec<code::Instructions>, actual: code::Instructions) {
         let concatted = concat_instructions(expected);
 
-        assert_eq!(concatted.len(), actual.len());
+        assert_eq!(
+            instruction_to_string(&concatted),
+            instruction_to_string(&actual)
+        );
 
         for (i, instruction) in actual.iter().enumerate() {
             assert_eq!(instruction, &concatted[i])
@@ -173,6 +185,7 @@ mod test {
             expected_instructions: vec![
                 code::make(&code::OP_CONSTANT, vec![0u16]),
                 code::make(&code::OP_CONSTANT, vec![1u16]),
+                code::make(&code::OP_ADD, EMPTY),
             ],
         }];
 

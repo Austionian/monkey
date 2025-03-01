@@ -6,10 +6,11 @@ use crate::{
 
 const STACK_SIZE: usize = 2048;
 
-struct VM {
+pub struct VM {
     constants: Vec<ObjectType>,
     instructions: code::Instructions,
     stack: [ObjectType; STACK_SIZE],
+    // stack pointer
     sp: usize,
 }
 
@@ -27,12 +28,6 @@ impl VM {
         // ip = 'instruction pointer'
         let mut ip = 0;
         while ip < self.instructions.len() {
-            println!(
-                "ip is {ip}, len is {}, {:?}",
-                self.instructions.len(),
-                self.instructions
-            );
-
             let op: Opcode = self.instructions[ip];
 
             match op {
@@ -42,6 +37,20 @@ impl VM {
 
                     // TODO: remove this clone and cast
                     self.push(self.constants[const_index as usize].clone())?;
+                }
+                code::OP_ADD => {
+                    let right = if let ObjectType::IntegerObj(r) = self.pop() {
+                        r
+                    } else {
+                        todo!();
+                    };
+                    let left = if let ObjectType::IntegerObj(l) = self.pop() {
+                        l
+                    } else {
+                        todo!();
+                    };
+
+                    self.push(ObjectType::IntegerObj(right + left))?;
                 }
                 _ => todo!(),
             }
@@ -61,6 +70,12 @@ impl VM {
         self.sp += 1;
 
         Ok(())
+    }
+
+    fn pop(&mut self) -> ObjectType {
+        let o = self.stack[self.sp - 1].clone();
+        self.sp -= 1;
+        o
     }
 
     pub fn stack_top(&self) -> Option<&ObjectType> {
@@ -145,7 +160,7 @@ mod test {
             },
             VmTestCase {
                 input: "1 + 2".to_string(),
-                expected: Box::new(2.0f64),
+                expected: Box::new(3.0f64),
             },
         ];
 

@@ -1,8 +1,10 @@
 use crate::{
+    compiler::Compiler,
     evaluator::eval_program,
     lexer,
     object::{Environment, Object},
     parser::Parser,
+    vm::VM,
 };
 use std::{
     io::{self, Write},
@@ -37,15 +39,31 @@ pub fn start(env: &mut Environment) {
         return;
     }
 
-    if let Ok(program) = program {
-        let evaluated = eval_program(&program, env);
-        println!("{}", evaluated.inspect());
-    }
+    // evaluated program
+    //if let Ok(program) = program {
+    //    let evaluated = eval_program(&program, env);
+    //    println!("{}", evaluated.inspect());
+    //}
     //let mut tok = Token::default();
     //while tok != Token::EOF {
     //    tok = lexer.next_token();
     //    println!("out: {:?}", tok);
     //}
+
+    if let Ok(program) = program {
+        let mut comp = Compiler::new();
+        if let Err(_) = comp.compile(program) {
+            eprintln!("woops! compilation failed");
+        }
+
+        let mut machine = VM::new(comp);
+        if let Err(e) = machine.run() {
+            eprintln!("whoops! executing the bytecode failed:, {e}");
+        }
+
+        let stack_top = machine.stack_top();
+        println!("{}", stack_top.unwrap().inspect());
+    }
 }
 
 const MONKEY_FACE: &str = r#"            __,__
