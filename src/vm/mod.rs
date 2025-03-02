@@ -52,6 +52,9 @@ impl VM {
 
                     self.push(ObjectType::IntegerObj(right + left))?;
                 }
+                code::OP_POP => {
+                    self.pop();
+                }
                 _ => todo!(),
             }
 
@@ -84,6 +87,10 @@ impl VM {
         } else {
             Some(&self.stack[self.sp - 1])
         }
+    }
+
+    pub fn last_popped_stack_elem(&self) -> ObjectType {
+        self.stack[self.sp].clone()
     }
 }
 
@@ -126,7 +133,7 @@ mod test {
             let mut vm = VM::new(comp.bytecode());
             vm.run().unwrap();
 
-            let stack_elem = vm.stack_top().unwrap();
+            let stack_elem = vm.last_popped_stack_elem();
             test_expected_object(test.expected, &stack_elem);
         }
     }

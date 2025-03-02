@@ -61,8 +61,8 @@ pub fn start(env: &mut Environment) {
             eprintln!("whoops! executing the bytecode failed:, {e}");
         }
 
-        let stack_top = machine.stack_top();
-        println!("{}", stack_top.unwrap().inspect());
+        let stack_top = machine.last_popped_stack_elem();
+        println!("{}", stack_top.inspect());
     }
 }
 

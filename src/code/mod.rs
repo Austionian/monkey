@@ -9,8 +9,10 @@ pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
 pub const EMPTY: [u8; 0] = [];
+// TODO: Should these just be an enum?
 pub const OP_CONSTANT: Opcode = 0;
 pub const OP_ADD: Opcode = 1;
+pub const OP_POP: Opcode = 2;
 
 #[derive(Clone)]
 pub struct Definition {
@@ -33,6 +35,14 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
         OP_ADD,
         Definition {
             name: "OpAdd",
+            operand_widths: vec![],
+        },
+    );
+
+    definitions.insert(
+        OP_POP,
+        Definition {
+            name: "OpPop",
             operand_widths: vec![],
         },
     );
@@ -92,6 +102,7 @@ impl Fixed for usize {
 
 pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
     op: &Opcode,
+    // TODO: make operands Option<>
     operands: impl IntoIterator<Item = T>,
 ) -> Vec<u8> {
     if let Some(def) = DEFINITIONS.get(op) {

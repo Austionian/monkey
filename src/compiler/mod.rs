@@ -1,6 +1,6 @@
 use crate::{
     ast,
-    code::{self, Opcode, DEFINITIONS, EMPTY, OP_CONSTANT},
+    code::{self, Opcode, DEFINITIONS, EMPTY, OP_ADD, OP_CONSTANT, OP_POP},
     object,
     token::Token,
 };
@@ -33,7 +33,11 @@ impl Compiler {
 
     fn compile_statement(&mut self, statement: ast::Statement) -> Result<(), CompilerError> {
         match statement {
-            ast::Statement::ExpressStatement(exp) => Ok(self.compile_expression(&exp)?),
+            ast::Statement::ExpressStatement(exp) => {
+                self.compile_expression(&exp)?;
+                self.emit(&OP_POP, vec![]);
+                Ok(())
+            }
             ast::Statement::LetStatement(exp) => Ok(Compiler::compile_let_statement(exp)?),
             ast::Statement::BlockStatement(exp) => Ok(Compiler::compile_block(exp)?),
             ast::Statement::ReturnStatement(exp) => Ok(Compiler::compile_return(exp)?),
@@ -77,10 +81,12 @@ impl Compiler {
 
     fn emit(&mut self, op: &Opcode, operands: Vec<usize>) -> usize {
         // TODO: this still doesn't make sense, why a vec of ops
+        // maybe this should be generic like make? And only the correct
+        // sizes get passed in?
         let mut ins: Vec<u8> = vec![];
         if let Some(def) = DEFINITIONS.get(op) {
-            if def.name == "OpAdd" {
-                self.add_instruction(&mut vec![1]);
+            if operands.is_empty() {
+                self.add_instruction(&mut vec![*op]);
             }
             for width in def.operand_widths.iter() {
                 match width {
@@ -179,15 +185,28 @@ mod test {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests = vec![CompilerTestCase {
-            input: "1 + 2".to_string(),
-            expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-            expected_instructions: vec![
-                code::make(&code::OP_CONSTANT, vec![0u16]),
-                code::make(&code::OP_CONSTANT, vec![1u16]),
-                code::make(&code::OP_ADD, EMPTY),
-            ],
-        }];
+        let tests = vec![
+            CompilerTestCase {
+                input: "1 + 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, vec![0u16]),
+                    code::make(&code::OP_CONSTANT, vec![1u16]),
+                    code::make(&code::OP_ADD, EMPTY),
+                    code::make(&code::OP_POP, EMPTY),
+                ],
+            },
+            CompilerTestCase {
+                input: "1; 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, vec![0u16]),
+                    code::make(&code::OP_POP, EMPTY),
+                    code::make(&code::OP_CONSTANT, vec![1u16]),
+                    code::make(&code::OP_POP, EMPTY),
+                ],
+            },
+        ];
 
         run_compiler_tests(tests);
     }
