@@ -8,44 +8,81 @@ use std::{
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
-pub const EMPTY: [u8; 0] = [];
+// Typed none to be passed into `make` when there are no
+// operands.
+pub const NONE: Option<Vec<u8>> = None;
 // TODO: Should these just be an enum?
 pub const OP_CONSTANT: Opcode = 0;
 pub const OP_ADD: Opcode = 1;
 pub const OP_POP: Opcode = 2;
+pub const OP_SUB: Opcode = 3;
+pub const OP_MUL: Opcode = 4;
+pub const OP_DIV: Opcode = 5;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Definition {
-    pub name: &'static str,
+    pub name: String,
     pub operand_widths: Vec<u8>,
 }
 
 pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| {
     let mut definitions = HashMap::new();
 
-    definitions.insert(
-        OP_CONSTANT,
-        Definition {
-            name: "OpConstant",
-            operand_widths: vec![2],
-        },
-    );
+    macro_rules! op_definition {
+        ($val:tt, $widths:expr) => { op_definition!(@ $val, $val, $widths); };
+        (@ $op_ident:ident, $op:expr, $widths:expr) => {{
+            let name = stringify!($op_ident)
+                .to_lowercase()
+                .to_string()
+                .split("_")
+                .map(|v| {
+                    let mut c = v.chars();
+                    match c.next() {
+                        None => String::new(),
+                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                    }
+                })
+                .collect::<String>();
 
-    definitions.insert(
-        OP_ADD,
-        Definition {
-            name: "OpAdd",
-            operand_widths: vec![],
-        },
-    );
+            definitions.insert(
+                $op,
+                Definition {
+                    name,
+                    operand_widths: vec![$widths],
+                },
+            );
+        }};
+        ($val:tt) => { op_definition!(@@ $val, $val); };
+        (@@ $op_ident:ident, $op:expr) => {{
+            let name = stringify!($op_ident)
+                .to_lowercase()
+                .to_string()
+                .split("_")
+                .map(|v| {
+                    let mut c = v.chars();
+                    match c.next() {
+                        None => String::new(),
+                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                    }
+                })
+                .collect::<String>();
 
-    definitions.insert(
-        OP_POP,
-        Definition {
-            name: "OpPop",
-            operand_widths: vec![],
-        },
-    );
+            definitions.insert(
+                $op,
+                Definition {
+                    name,
+                    operand_widths: vec![],
+                },
+            );
+        }};
+    }
+
+    op_definition!(OP_CONSTANT, 2);
+    op_definition!(OP_ADD);
+    op_definition!(OP_POP);
+    op_definition!(OP_SUB);
+    op_definition!(OP_MUL);
+    op_definition!(OP_DIV);
 
     definitions
 });
@@ -102,8 +139,7 @@ impl Fixed for usize {
 
 pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
     op: &Opcode,
-    // TODO: make operands Option<>
-    operands: impl IntoIterator<Item = T>,
+    operands: Option<impl IntoIterator<Item = T>>,
 ) -> Vec<u8> {
     if let Some(def) = DEFINITIONS.get(op) {
         let mut instruction_len = 1;
@@ -116,13 +152,15 @@ pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
         instruction[0] = *op;
 
         let mut offset = 1;
-        for (i, o) in operands.into_iter().enumerate() {
-            let width = def.operand_widths[i];
-            let mut cursor = Cursor::new(&mut instruction);
-            cursor.seek_relative(offset as i64).unwrap();
-            cursor.write(&o.to_be_bytes()).unwrap();
+        if let Some(operands) = operands {
+            for (i, o) in operands.into_iter().enumerate() {
+                let width = def.operand_widths[i];
+                let mut cursor = Cursor::new(&mut instruction);
+                cursor.seek_relative(offset as i64).unwrap();
+                cursor.write(&o.to_be_bytes()).unwrap();
 
-            offset += width;
+                offset += width;
+            }
         }
 
         instruction
@@ -213,7 +251,7 @@ mod test {
         ];
 
         for test in tests {
-            let instruction = make(&test.op, test.operands);
+            let instruction = make(&test.op, Some(test.operands));
 
             assert_eq!(instruction.len(), test.expected.len());
 
@@ -225,11 +263,10 @@ mod test {
 
     #[test]
     fn test_instructions_string() {
-        let op_add: Vec<u8> = vec![];
         let instructions: Vec<Instructions> = vec![
-            make(&OP_ADD, op_add),
-            make(&OP_CONSTANT, vec![2u16]),
-            make(&OP_CONSTANT, vec![65535u16]),
+            make(&OP_ADD, NONE),
+            make(&OP_CONSTANT, Some(vec![2u16])),
+            make(&OP_CONSTANT, Some(vec![65535u16])),
         ];
 
         let expected = r#"0000 OpAdd
@@ -261,7 +298,7 @@ mod test {
         }];
 
         for t in tests.iter() {
-            let instruction = make(&t.op, t.operands.clone());
+            let instruction = make(&t.op, Some(t.operands.clone()));
             let def = look_up(&t.op).unwrap();
 
             let (operands_read, n) = read_operands(&def, &instruction[1..]);

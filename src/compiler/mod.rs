@@ -1,6 +1,6 @@
 use crate::{
     ast,
-    code::{self, Opcode, DEFINITIONS, EMPTY, OP_ADD, OP_CONSTANT, OP_POP},
+    code::{self, Opcode, DEFINITIONS, OP_CONSTANT, OP_POP},
     object,
     token::Token,
 };
@@ -65,6 +65,9 @@ impl Compiler {
 
                 match operator {
                     Token::PLUS => self.emit(&code::OP_ADD, vec![]),
+                    Token::MINUS => self.emit(&code::OP_SUB, vec![]),
+                    Token::SLASH => self.emit(&code::OP_DIV, vec![]),
+                    Token::ASTERISK => self.emit(&code::OP_MUL, vec![]),
                     _ => todo!(),
                 };
             }
@@ -91,7 +94,7 @@ impl Compiler {
             for width in def.operand_widths.iter() {
                 match width {
                     2 => {
-                        ins = code::make(op, operands.iter().map(|x| *x as u16));
+                        ins = code::make(op, Some(operands.iter().map(|x| *x as u16)));
                     }
                     _ => todo!(),
                 };
@@ -125,6 +128,7 @@ impl Compiler {
 mod test {
     use super::*;
     use crate::{code::instruction_to_string, lexer::Lexer, parser::Parser, test_setup};
+    use code::NONE;
     use core::panic;
     use object::ObjectType;
 
@@ -190,20 +194,50 @@ mod test {
                 input: "1 + 2".to_string(),
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, vec![0u16]),
-                    code::make(&code::OP_CONSTANT, vec![1u16]),
-                    code::make(&code::OP_ADD, EMPTY),
-                    code::make(&code::OP_POP, EMPTY),
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_ADD, NONE),
+                    code::make(&code::OP_POP, NONE),
                 ],
             },
             CompilerTestCase {
                 input: "1; 2".to_string(),
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, vec![0u16]),
-                    code::make(&code::OP_POP, EMPTY),
-                    code::make(&code::OP_CONSTANT, vec![1u16]),
-                    code::make(&code::OP_POP, EMPTY),
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_POP, NONE),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 - 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_SUB, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 * 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_MUL, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "2 / 1".to_string(),
+                expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_DIV, NONE),
+                    code::make(&code::OP_POP, NONE),
                 ],
             },
         ];

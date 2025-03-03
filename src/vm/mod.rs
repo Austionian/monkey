@@ -1,8 +1,9 @@
 use crate::{
     code::{self, Opcode},
     compiler::ByteCode,
-    object::ObjectType,
+    object::{Object, ObjectType},
 };
+use std::{any::Any, mem};
 
 const STACK_SIZE: usize = 2048;
 
@@ -38,19 +39,8 @@ impl VM {
                     // TODO: remove this clone and cast
                     self.push(self.constants[const_index as usize].clone())?;
                 }
-                code::OP_ADD => {
-                    let right = if let ObjectType::IntegerObj(r) = self.pop() {
-                        r
-                    } else {
-                        todo!();
-                    };
-                    let left = if let ObjectType::IntegerObj(l) = self.pop() {
-                        l
-                    } else {
-                        todo!();
-                    };
-
-                    self.push(ObjectType::IntegerObj(right + left))?;
+                code::OP_ADD | code::OP_SUB | code::OP_MUL | code::OP_DIV => {
+                    self.execute_binary_operation(&op)?
                 }
                 code::OP_POP => {
                     self.pop();
@@ -62,6 +52,36 @@ impl VM {
         }
 
         Ok(())
+    }
+
+    fn execute_binary_operation(&mut self, op: &Opcode) -> Result<(), String> {
+        if let ObjectType::IntegerObj(right) = self.pop() {
+            if let ObjectType::IntegerObj(left) = self.pop() {
+                self.execute_binary_int_operation(op, left, right)?;
+            } else {
+                todo!();
+            };
+        } else {
+            todo!();
+        };
+
+        Ok(())
+    }
+
+    fn execute_binary_int_operation(
+        &mut self,
+        op: &Opcode,
+        left: f64,
+        right: f64,
+    ) -> Result<(), String> {
+        match op {
+            &code::OP_ADD => self.push(ObjectType::IntegerObj(left + right)),
+            &code::OP_SUB => self.push(ObjectType::IntegerObj(left - right)),
+            &code::OP_MUL => self.push(ObjectType::IntegerObj(left * right)),
+            &code::OP_DIV => self.push(ObjectType::IntegerObj(left / right)),
+
+            _ => return Err(format!("Unsupported integer operator: {}", op)),
+        }
     }
 
     fn push(&mut self, o: ObjectType) -> Result<(), String> {
@@ -168,6 +188,22 @@ mod test {
             VmTestCase {
                 input: "1 + 2".to_string(),
                 expected: Box::new(3.0f64),
+            },
+            VmTestCase {
+                input: "1 - 2".to_string(),
+                expected: Box::new(-1.0f64),
+            },
+            VmTestCase {
+                input: "1 * 2".to_string(),
+                expected: Box::new(2.0f64),
+            },
+            VmTestCase {
+                input: "2 / 1".to_string(),
+                expected: Box::new(2.0f64),
+            },
+            VmTestCase {
+                input: "5 * (2 + 10)".to_string(),
+                expected: Box::new(60.0f64),
             },
         ];
 
