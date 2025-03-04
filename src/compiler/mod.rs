@@ -1,6 +1,6 @@
 use crate::{
     ast,
-    code::{self, Opcode, DEFINITIONS, OP_CONSTANT, OP_POP},
+    code::{self, Opcode, DEFINITIONS, OP_CONSTANT, OP_FALSE, OP_POP, OP_TRUE},
     object,
     token::Token,
 };
@@ -59,6 +59,15 @@ impl Compiler {
                 let i = self.add_constant(integer);
                 let _ = self.emit(&OP_CONSTANT, vec![i]);
             }
+            ast::Expression::BoolExpression(t) => match t {
+                Token::TRUE => {
+                    self.emit(&OP_TRUE, vec![]);
+                }
+                Token::FALSE => {
+                    self.emit(&OP_FALSE, vec![]);
+                }
+                _ => unreachable!("Only bools should be in bool expressions"),
+            },
             ast::Expression::InfixExpression((operator, left, right)) => {
                 self.compile_expression(left.as_ref())?;
                 self.compile_expression(right.as_ref())?;
@@ -132,8 +141,10 @@ mod test {
     use core::panic;
     use object::ObjectType;
 
+    #[derive(Debug)]
     enum CompilerInterface {
         Int(f64),
+        Bool(bool),
     }
 
     struct CompilerTestCase {
@@ -146,6 +157,7 @@ mod test {
     fn concat_instructions(expected: Vec<code::Instructions>) -> code::Instructions {
         expected.into_iter().flatten().collect()
     }
+
     fn test_instructions(expected: Vec<code::Instructions>, actual: code::Instructions) {
         let concatted = concat_instructions(expected);
 
@@ -156,6 +168,13 @@ mod test {
 
         for (i, instruction) in actual.iter().enumerate() {
             assert_eq!(instruction, &concatted[i])
+        }
+    }
+
+    fn test_bool_object(expected: bool, actual: &object::ObjectType) {
+        match actual {
+            ObjectType::BoolObj(x) => assert_eq!(expected, *x),
+            _ => panic!("expected only bool objects"),
         }
     }
 
@@ -172,6 +191,8 @@ mod test {
         for (i, constant) in expected.iter().enumerate() {
             match constant {
                 CompilerInterface::Int(x) => test_integer_object(*x, &actual[i]),
+                CompilerInterface::Bool(b) => test_bool_object(*b, &actual[i]),
+                _ => todo!(),
             }
         }
     }
@@ -237,6 +258,22 @@ mod test {
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
                     code::make(&code::OP_CONSTANT, Some(vec![1u16])),
                     code::make(&code::OP_DIV, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "true".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    code::make(&code::OP_TRUE, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "false".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    code::make(&code::OP_FALSE, NONE),
                     code::make(&code::OP_POP, NONE),
                 ],
             },

@@ -18,6 +18,8 @@ pub const OP_POP: Opcode = 2;
 pub const OP_SUB: Opcode = 3;
 pub const OP_MUL: Opcode = 4;
 pub const OP_DIV: Opcode = 5;
+pub const OP_TRUE: Opcode = 6;
+pub const OP_FALSE: Opcode = 7;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -83,6 +85,8 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_SUB);
     op_definition!(OP_MUL);
     op_definition!(OP_DIV);
+    op_definition!(OP_TRUE);
+    op_definition!(OP_FALSE);
 
     definitions
 });

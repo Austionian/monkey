@@ -1,11 +1,12 @@
 use crate::{
     code::{self, Opcode},
     compiler::ByteCode,
-    object::{Object, ObjectType},
+    object::ObjectType,
 };
-use std::{any::Any, mem};
 
 const STACK_SIZE: usize = 2048;
+const TRUE: ObjectType = ObjectType::BoolObj(true);
+const FALSE: ObjectType = ObjectType::BoolObj(false);
 
 pub struct VM {
     constants: Vec<ObjectType>,
@@ -45,6 +46,8 @@ impl VM {
                 code::OP_POP => {
                     self.pop();
                 }
+                code::OP_TRUE => self.push(TRUE)?,
+                code::OP_FALSE => self.push(FALSE)?,
                 _ => todo!(),
             }
 
@@ -118,7 +121,6 @@ impl VM {
 mod test {
     use super::*;
     use crate::{
-        code,
         compiler::Compiler,
         lexer::Lexer,
         object::{self, ObjectType},
@@ -128,18 +130,8 @@ mod test {
     use core::panic;
     use std::any::Any;
 
-    enum CompilerInterface {
-        Int(f64),
-    }
-
-    struct CompilerTestCase {
-        input: String,
-        expected_constants: Vec<CompilerInterface>,
-        expected_instructions: Vec<code::Instructions>,
-    }
-
     struct VmTestCase {
-        input: String,
+        input: &'static str,
         expected: Box<dyn Any>,
     }
 
@@ -163,8 +155,19 @@ mod test {
             test_integer_object(*expected.downcast::<f64>().unwrap(), actual);
             return;
         }
+        if expected.is::<bool>() {
+            test_bool_object(*expected.downcast::<bool>().unwrap(), actual);
+            return;
+        }
 
         panic!("expected f64");
+    }
+
+    fn test_bool_object(expected: bool, actual: &object::ObjectType) {
+        match actual {
+            ObjectType::BoolObj(b) => assert_eq!(expected, *b),
+            _ => panic!("expected only bool objects"),
+        }
     }
 
     fn test_integer_object(expected: f64, actual: &object::ObjectType) {
@@ -178,32 +181,40 @@ mod test {
     fn test_integer_arithmetic() {
         let tests: Vec<VmTestCase> = vec![
             VmTestCase {
-                input: "1".to_string(),
+                input: "1",
                 expected: Box::new(1.0f64),
             },
             VmTestCase {
-                input: "2".to_string(),
+                input: "2",
                 expected: Box::new(2.0f64),
             },
             VmTestCase {
-                input: "1 + 2".to_string(),
+                input: "1 + 2",
                 expected: Box::new(3.0f64),
             },
             VmTestCase {
-                input: "1 - 2".to_string(),
+                input: "1 - 2",
                 expected: Box::new(-1.0f64),
             },
             VmTestCase {
-                input: "1 * 2".to_string(),
+                input: "1 * 2",
                 expected: Box::new(2.0f64),
             },
             VmTestCase {
-                input: "2 / 1".to_string(),
+                input: "2 / 1",
                 expected: Box::new(2.0f64),
             },
             VmTestCase {
-                input: "5 * (2 + 10)".to_string(),
+                input: "5 * (2 + 10)",
                 expected: Box::new(60.0f64),
+            },
+            VmTestCase {
+                input: "true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "false",
+                expected: Box::new(false),
             },
         ];
 
