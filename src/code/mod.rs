@@ -8,9 +8,6 @@ use std::{
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
-// Typed none to be passed into `make` when there are no
-// operands.
-pub const NONE: Option<Vec<u8>> = None;
 // TODO: Should these just be an enum?
 pub const OP_CONSTANT: Opcode = 0;
 pub const OP_ADD: Opcode = 1;
