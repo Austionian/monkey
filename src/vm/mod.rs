@@ -48,6 +48,9 @@ impl VM {
                 }
                 code::OP_TRUE => self.push(TRUE)?,
                 code::OP_FALSE => self.push(FALSE)?,
+                code::OP_EQUAL | code::OP_NOT_EQUAL | code::OP_GREATER_THAN => {
+                    self.execute_comparison(&op)?
+                }
                 _ => todo!(),
             }
 
@@ -55,6 +58,32 @@ impl VM {
         }
 
         Ok(())
+    }
+
+    fn execute_comparison(&mut self, op: &Opcode) -> Result<(), String> {
+        let right = self.pop();
+        let left = self.pop();
+
+        if let ObjectType::IntegerObj(right) = right {
+            if let ObjectType::IntegerObj(left) = left {
+                return self.execute_int_comparison(op, left, right);
+            }
+        }
+
+        match op {
+            &code::OP_EQUAL => self.push(ObjectType::BoolObj(right == left)),
+            &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(right != left)),
+            _ => Err(format!("Unknown operator: {}", op)),
+        }
+    }
+
+    fn execute_int_comparison(&mut self, op: &Opcode, left: f64, right: f64) -> Result<(), String> {
+        match op {
+            &code::OP_GREATER_THAN => self.push(ObjectType::BoolObj(left > right)),
+            &code::OP_EQUAL => self.push(ObjectType::BoolObj(left == right)),
+            &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(left != right)),
+            _ => Err(format!("Unknown operator: {}", op)),
+        }
     }
 
     fn execute_binary_operation(&mut self, op: &Opcode) -> Result<(), String> {
@@ -215,6 +244,90 @@ mod test {
             VmTestCase {
                 input: "false",
                 expected: Box::new(false),
+            },
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_bool_expressions() {
+        let tests = vec![
+            VmTestCase {
+                input: "true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "false",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 < 2",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "1 > 2",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 < 1",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 > 1",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 == 1",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "1 != 1",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 == 2",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "1 != 2",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "true == true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "false == false",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "true == false",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "true != false",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "false != true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "(1 < 2) == true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "(1 < 2) == false",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "(1 > 2) == true",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "(1 > 2) == false",
+                expected: Box::new(true),
             },
         ];
 
