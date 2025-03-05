@@ -69,6 +69,14 @@ impl Compiler {
                 _ => unreachable!("Only bools should be in bool expressions"),
             },
             ast::Expression::InfixExpression((operator, left, right)) => {
+                if operator == &Token::LT {
+                    // Flip the order rather than make an OP_LESS_THAN
+                    self.compile_expression(right.as_ref())?;
+                    self.compile_expression(left.as_ref())?;
+                    self.emit(&code::OP_GREATER_THAN, vec![]);
+
+                    return Ok(());
+                }
                 self.compile_expression(left.as_ref())?;
                 self.compile_expression(right.as_ref())?;
 
@@ -77,6 +85,9 @@ impl Compiler {
                     Token::MINUS => self.emit(&code::OP_SUB, vec![]),
                     Token::SLASH => self.emit(&code::OP_DIV, vec![]),
                     Token::ASTERISK => self.emit(&code::OP_MUL, vec![]),
+                    Token::GT => self.emit(&code::OP_GREATER_THAN, vec![]),
+                    Token::EQ => self.emit(&code::OP_EQUAL, vec![]),
+                    Token::NOT_EQ => self.emit(&code::OP_NOT_EQUAL, vec![]),
                     _ => todo!(),
                 };
             }
@@ -274,6 +285,56 @@ mod test {
                 expected_constants: vec![],
                 expected_instructions: vec![
                     code::make(&code::OP_FALSE, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 > 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_GREATER_THAN, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 < 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_GREATER_THAN, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 == 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_EQUAL, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "1 != 2".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_NOT_EQUAL, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "true != false".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    code::make(&code::OP_TRUE, NONE),
+                    code::make(&code::OP_FALSE, NONE),
+                    code::make(&code::OP_NOT_EQUAL, NONE),
                     code::make(&code::OP_POP, NONE),
                 ],
             },

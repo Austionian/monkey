@@ -8,6 +8,7 @@ use std::{
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
+pub const NONE: Option<Vec<u8>> = None;
 // TODO: Should these just be an enum?
 pub const OP_CONSTANT: Opcode = 0;
 pub const OP_ADD: Opcode = 1;
@@ -17,6 +18,9 @@ pub const OP_MUL: Opcode = 4;
 pub const OP_DIV: Opcode = 5;
 pub const OP_TRUE: Opcode = 6;
 pub const OP_FALSE: Opcode = 7;
+pub const OP_EQUAL: Opcode = 8;
+pub const OP_NOT_EQUAL: Opcode = 9;
+pub const OP_GREATER_THAN: Opcode = 10;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -84,6 +88,9 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_DIV);
     op_definition!(OP_TRUE);
     op_definition!(OP_FALSE);
+    op_definition!(OP_EQUAL);
+    op_definition!(OP_NOT_EQUAL);
+    op_definition!(OP_GREATER_THAN);
 
     definitions
 });
