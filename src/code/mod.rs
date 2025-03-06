@@ -21,6 +21,8 @@ pub const OP_FALSE: Opcode = 7;
 pub const OP_EQUAL: Opcode = 8;
 pub const OP_NOT_EQUAL: Opcode = 9;
 pub const OP_GREATER_THAN: Opcode = 10;
+pub const OP_MINUS: Opcode = 11;
+pub const OP_BANG: Opcode = 12;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -91,6 +93,8 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_EQUAL);
     op_definition!(OP_NOT_EQUAL);
     op_definition!(OP_GREATER_THAN);
+    op_definition!(OP_MINUS);
+    op_definition!(OP_BANG);
 
     definitions
 });

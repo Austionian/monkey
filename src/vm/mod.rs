@@ -51,6 +51,8 @@ impl VM {
                 code::OP_EQUAL | code::OP_NOT_EQUAL | code::OP_GREATER_THAN => {
                     self.execute_comparison(&op)?
                 }
+                code::OP_BANG => self.execute_bang_operator()?,
+                code::OP_MINUS => self.execute_minus_operator()?,
                 _ => todo!(),
             }
 
@@ -58,6 +60,25 @@ impl VM {
         }
 
         Ok(())
+    }
+
+    fn execute_minus_operator(&mut self) -> Result<(), String> {
+        let operand = self.pop();
+
+        if let ObjectType::IntegerObj(value) = operand {
+            self.push(ObjectType::IntegerObj(-value))
+        } else {
+            Err(format!("Unsupported type for negation: {}", operand))
+        }
+    }
+
+    fn execute_bang_operator(&mut self) -> Result<(), String> {
+        let operand = self.pop();
+
+        match operand {
+            ObjectType::BoolObj(b) => self.push(ObjectType::BoolObj(!b)),
+            _ => self.push(ObjectType::BoolObj(false)),
+        }
     }
 
     fn execute_comparison(&mut self, op: &Opcode) -> Result<(), String> {
@@ -238,12 +259,20 @@ mod test {
                 expected: Box::new(60.0f64),
             },
             VmTestCase {
-                input: "true",
-                expected: Box::new(true),
+                input: "-5",
+                expected: Box::new(-5.0f64),
             },
             VmTestCase {
-                input: "false",
-                expected: Box::new(false),
+                input: "-10",
+                expected: Box::new(-10.0f64),
+            },
+            VmTestCase {
+                input: "-50 + 100 + -50",
+                expected: Box::new(0.0f64),
+            },
+            VmTestCase {
+                input: "(5 + 10 * 2 + 15 / 3) * 2 + -10",
+                expected: Box::new(50.0f64),
             },
         ];
 
@@ -326,7 +355,27 @@ mod test {
                 expected: Box::new(false),
             },
             VmTestCase {
-                input: "(1 > 2) == false",
+                input: "!true",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "!false",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "!5",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "!!true",
+                expected: Box::new(true),
+            },
+            VmTestCase {
+                input: "!!false",
+                expected: Box::new(false),
+            },
+            VmTestCase {
+                input: "!!5",
                 expected: Box::new(true),
             },
         ];

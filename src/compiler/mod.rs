@@ -91,6 +91,15 @@ impl Compiler {
                     _ => todo!(),
                 };
             }
+            ast::Expression::PrefixExpression((operator, right)) => {
+                self.compile_expression(right.as_ref())?;
+
+                match operator {
+                    Token::BANG => self.emit(&code::OP_BANG, vec![]),
+                    Token::MINUS => self.emit(&code::OP_MINUS, vec![]),
+                    _ => todo!(),
+                };
+            }
             _ => todo!(),
         }
 
@@ -273,6 +282,23 @@ mod test {
                 ],
             },
             CompilerTestCase {
+                input: "-1".to_string(),
+                expected_constants: vec![CompilerInterface::Int(1.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_MINUS, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+        ];
+
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_boolean_expressions() {
+        let tests = vec![
+            CompilerTestCase {
                 input: "true".to_string(),
                 expected_constants: vec![],
                 expected_instructions: vec![
@@ -335,6 +361,15 @@ mod test {
                     code::make(&code::OP_TRUE, NONE),
                     code::make(&code::OP_FALSE, NONE),
                     code::make(&code::OP_NOT_EQUAL, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "!true".to_string(),
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    code::make(&code::OP_TRUE, NONE),
+                    code::make(&code::OP_BANG, NONE),
                     code::make(&code::OP_POP, NONE),
                 ],
             },
