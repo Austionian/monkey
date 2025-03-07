@@ -2,6 +2,7 @@ use std::{
     cell::LazyCell,
     clone::Clone,
     collections::HashMap,
+    fmt::Display,
     io::{Cursor, Seek, Write},
 };
 
@@ -23,6 +24,8 @@ pub const OP_NOT_EQUAL: Opcode = 9;
 pub const OP_GREATER_THAN: Opcode = 10;
 pub const OP_MINUS: Opcode = 11;
 pub const OP_BANG: Opcode = 12;
+pub const OP_JUMP: Opcode = 13;
+pub const OP_JUMP_NOT_TRUTHY: Opcode = 14;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -95,6 +98,8 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_GREATER_THAN);
     op_definition!(OP_MINUS);
     op_definition!(OP_BANG);
+    op_definition!(OP_JUMP, 2);
+    op_definition!(OP_JUMP_NOT_TRUTHY, 2);
 
     definitions
 });
@@ -152,7 +157,10 @@ impl Fixed for usize {
 pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
     op: &Opcode,
     operands: Option<impl IntoIterator<Item = T>>,
-) -> Vec<u8> {
+) -> Vec<u8>
+where
+    T: Display,
+{
     if let Some(def) = DEFINITIONS.get(op) {
         let mut instruction_len = 1;
 
@@ -169,7 +177,7 @@ pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
                 let width = def.operand_widths[i];
                 let mut cursor = Cursor::new(&mut instruction);
                 cursor.seek_relative(offset as i64).unwrap();
-                cursor.write(&o.to_be_bytes()).unwrap();
+                cursor.write_all(&o.to_be_bytes()).unwrap();
 
                 offset += width;
             }

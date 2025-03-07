@@ -64,8 +64,6 @@ fn parse_int(p: &mut Parser) -> Option<Expression> {
 
 fn parse_prefix_expression(p: &mut Parser) -> Option<Expression> {
     let prefix = p.cur_token.clone();
-    println!("{p:?}");
-    println!("{prefix:?}");
     p.next_token();
     let right = p.parse_expression(ExpressionPrecendence::PREFIX).unwrap();
     Some(Expression::PrefixExpression((prefix, Box::new(right))))

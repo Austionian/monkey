@@ -8,9 +8,22 @@ use crate::{
 pub struct Compiler {
     pub instructions: code::Instructions,
     pub constants: Vec<object::ObjectType>,
+    // very last instruction
+    pub last_instruction: EmittedInstruction,
+    // instruction before last_instruction
+    pub previous_instruction: EmittedInstruction,
 }
 
-pub type ByteCode = Compiler;
+#[derive(Default, Clone)]
+pub struct EmittedInstruction {
+    opcode: Opcode,
+    position: usize,
+}
+
+pub struct ByteCode {
+    pub instructions: code::Instructions,
+    pub constants: Vec<object::ObjectType>,
+}
 
 #[derive(Debug)]
 pub struct CompilerError {}
@@ -20,18 +33,20 @@ impl Compiler {
         Self {
             instructions: Vec::new(),
             constants: Vec::new(),
+            last_instruction: EmittedInstruction::default(),
+            previous_instruction: EmittedInstruction::default(),
         }
     }
 
     pub fn compile(&mut self, node: ast::Program) -> Result<(), CompilerError> {
         for statement in node.statements {
-            self.compile_statement(statement)?;
+            self.compile_statement(&statement)?;
         }
 
         Ok(())
     }
 
-    fn compile_statement(&mut self, statement: ast::Statement) -> Result<(), CompilerError> {
+    fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompilerError> {
         match statement {
             ast::Statement::ExpressStatement(exp) => {
                 self.compile_expression(&exp)?;
@@ -44,11 +59,11 @@ impl Compiler {
         }
     }
 
-    fn compile_return(expression: ast::ReturnStatement) -> Result<(), CompilerError> {
+    fn compile_return(expression: &ast::ReturnStatement) -> Result<(), CompilerError> {
         todo!()
     }
 
-    fn compile_block(expression: ast::BlockStatement) -> Result<(), CompilerError> {
+    fn compile_block(expression: &ast::BlockStatement) -> Result<(), CompilerError> {
         todo!()
     }
 
@@ -100,10 +115,62 @@ impl Compiler {
                     _ => todo!(),
                 };
             }
+            ast::Expression::IfExpression(condition, consequence, alternative) => {
+                self.compile_expression(condition.as_ref())?;
+
+                // emit with bogus jump value
+                let jump_not_truthy = self.emit(&code::OP_JUMP_NOT_TRUTHY, vec![9999]);
+
+                self.compile_block_statement(consequence.as_ref())?;
+
+                if self.last_instruction_is_pop() {
+                    self.remove_last_pop();
+                }
+
+                if let Some(alternative) = alternative {
+                    // emit a jump with a bogus value
+                    let jump_position = self.emit(&code::OP_JUMP, vec![9999]);
+
+                    let after_consequence_position = self.instructions.len();
+                    self.change_operand(jump_not_truthy, after_consequence_position);
+
+                    self.compile_block_statement(alternative)?;
+
+                    if self.last_instruction_is_pop() {
+                        self.remove_last_pop();
+                    }
+
+                    let after_alternative_position = self.instructions.len();
+                    self.change_operand(jump_position, after_alternative_position);
+                } else {
+                    let after_consequence_position = self.instructions.len();
+                    self.change_operand(jump_not_truthy, after_consequence_position);
+                }
+            }
             _ => todo!(),
         }
 
         Ok(())
+    }
+
+    fn compile_block_statement(
+        &mut self,
+        block: &ast::BlockStatement,
+    ) -> Result<(), CompilerError> {
+        for statement in block.statements.iter() {
+            self.compile_statement(statement)?;
+        }
+
+        Ok(())
+    }
+
+    fn remove_last_pop(&mut self) {
+        self.instructions = self.instructions[..self.last_instruction.position].to_vec();
+        self.last_instruction = self.previous_instruction.clone();
+    }
+
+    fn last_instruction_is_pop(&self) -> bool {
+        self.last_instruction.opcode == code::OP_POP
     }
 
     fn add_constant(&mut self, obj: object::ObjectType) -> usize {
@@ -117,9 +184,6 @@ impl Compiler {
         // sizes get passed in?
         let mut ins: Vec<u8> = vec![];
         if let Some(def) = DEFINITIONS.get(op) {
-            if operands.is_empty() {
-                self.add_instruction(&mut vec![*op]);
-            }
             for width in def.operand_widths.iter() {
                 match width {
                     2 => {
@@ -131,7 +195,41 @@ impl Compiler {
         } else {
             panic!("Opcode not found!");
         }
-        self.add_instruction(&mut ins)
+
+        let pos;
+        if operands.is_empty() {
+            pos = self.add_instruction(&mut vec![*op]);
+        } else {
+            pos = self.add_instruction(&mut ins);
+        }
+
+        self.set_last_instruction(op, pos);
+
+        pos
+    }
+
+    fn change_operand(&mut self, op_position: usize, operand: usize) {
+        let op = self.instructions[op_position];
+        let new_instruction = code::make(&op, Some(vec![operand as u16]));
+
+        self.replace_instruction(op_position, new_instruction);
+    }
+
+    fn replace_instruction(&mut self, position: usize, new_instruction: Vec<u8>) {
+        for i in 0..new_instruction.len() {
+            self.instructions[position + i] = new_instruction[i]
+        }
+    }
+
+    fn set_last_instruction(&mut self, opcode: &Opcode, position: usize) {
+        let previous = self.last_instruction.clone();
+        let last = EmittedInstruction {
+            opcode: *opcode,
+            position,
+        };
+
+        self.previous_instruction = previous;
+        self.last_instruction = last;
     }
 
     fn add_instruction(&mut self, ins: &mut Vec<u8>) -> usize {
@@ -141,7 +239,7 @@ impl Compiler {
         pos_new_instruction
     }
 
-    fn compile_let_statement(statement: ast::LetStatement) -> Result<(), CompilerError> {
+    fn compile_let_statement(statement: &ast::LetStatement) -> Result<(), CompilerError> {
         todo!()
     }
 
@@ -370,6 +468,47 @@ mod test {
                 expected_instructions: vec![
                     code::make(&code::OP_TRUE, NONE),
                     code::make(&code::OP_BANG, NONE),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+        ];
+
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            CompilerTestCase {
+                input: "if (true) { 10 }; 3333;".to_string(),
+                expected_constants: vec![
+                    CompilerInterface::Int(10.0),
+                    CompilerInterface::Int(3333.0),
+                ],
+                expected_instructions: vec![
+                    code::make(&code::OP_TRUE, NONE),
+                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![7u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_POP, NONE),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: "if (true) { 10 } else { 20 }; 3333;".to_string(),
+                expected_constants: vec![
+                    CompilerInterface::Int(10.0),
+                    CompilerInterface::Int(20.0),
+                    CompilerInterface::Int(3333.0),
+                ],
+                expected_instructions: vec![
+                    code::make(&code::OP_TRUE, NONE),
+                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![10u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_JUMP, Some(vec![13u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_POP, NONE),
+                    code::make(&code::OP_CONSTANT, Some(vec![2u16])),
                     code::make(&code::OP_POP, NONE),
                 ],
             },

@@ -56,7 +56,7 @@ pub fn start(env: &mut Environment) {
             eprintln!("woops! compilation failed");
         }
 
-        let mut machine = VM::new(comp);
+        let mut machine = VM::new(comp.bytecode());
         if let Err(e) = machine.run() {
             eprintln!("whoops! executing the bytecode failed:, {e}");
         }
