@@ -53,6 +53,18 @@ impl VM {
                 }
                 code::OP_BANG => self.execute_bang_operator()?,
                 code::OP_MINUS => self.execute_minus_operator()?,
+                code::OP_JUMP => {
+                    let pos = code::read_u16(&self.instructions[ip + 1..]);
+                    ip = pos as usize - 1;
+                }
+                code::OP_JUMP_NOT_TRUTHY => {
+                    let pos = code::read_u16(&self.instructions[ip + 1..]);
+                    ip += 2;
+
+                    if !Self::is_truthy(self.pop()) {
+                        ip = pos as usize - 1;
+                    }
+                }
                 _ => todo!(),
             }
 
@@ -60,6 +72,14 @@ impl VM {
         }
 
         Ok(())
+    }
+
+    fn is_truthy(obj: ObjectType) -> bool {
+        if let ObjectType::BoolObj(value) = obj {
+            value
+        } else {
+            true
+        }
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), String> {
@@ -227,53 +247,29 @@ mod test {
         }
     }
 
+    macro_rules! vm_test_case {
+        ($input:expr, $expected:expr) => {{
+            VmTestCase {
+                input: $input,
+                expected: $expected,
+            }
+        }};
+    }
+
     #[test]
     fn test_integer_arithmetic() {
         let tests: Vec<VmTestCase> = vec![
-            VmTestCase {
-                input: "1",
-                expected: Box::new(1.0f64),
-            },
-            VmTestCase {
-                input: "2",
-                expected: Box::new(2.0f64),
-            },
-            VmTestCase {
-                input: "1 + 2",
-                expected: Box::new(3.0f64),
-            },
-            VmTestCase {
-                input: "1 - 2",
-                expected: Box::new(-1.0f64),
-            },
-            VmTestCase {
-                input: "1 * 2",
-                expected: Box::new(2.0f64),
-            },
-            VmTestCase {
-                input: "2 / 1",
-                expected: Box::new(2.0f64),
-            },
-            VmTestCase {
-                input: "5 * (2 + 10)",
-                expected: Box::new(60.0f64),
-            },
-            VmTestCase {
-                input: "-5",
-                expected: Box::new(-5.0f64),
-            },
-            VmTestCase {
-                input: "-10",
-                expected: Box::new(-10.0f64),
-            },
-            VmTestCase {
-                input: "-50 + 100 + -50",
-                expected: Box::new(0.0f64),
-            },
-            VmTestCase {
-                input: "(5 + 10 * 2 + 15 / 3) * 2 + -10",
-                expected: Box::new(50.0f64),
-            },
+            vm_test_case!("1", Box::new(1.0f64)),
+            vm_test_case!("2", Box::new(2.0f64)),
+            vm_test_case!("1 + 2", Box::new(3.0f64)),
+            vm_test_case!("1 - 2", Box::new(-1.0f64)),
+            vm_test_case!("1 * 2", Box::new(2.0f64)),
+            vm_test_case!("2 / 1", Box::new(2.0f64)),
+            vm_test_case!("5 * (2 + 10)", Box::new(60.0f64)),
+            vm_test_case!("-5", Box::new(-5.0f64)),
+            vm_test_case!("-10", Box::new(-10.0f64)),
+            vm_test_case!("-50 + 100 + -50", Box::new(0.0f64)),
+            vm_test_case!("(5 + 10 * 2 + 15 / 3) * 2 + -10", Box::new(50.0f64)),
         ];
 
         run_vm_tests(tests);
@@ -282,102 +278,45 @@ mod test {
     #[test]
     fn test_bool_expressions() {
         let tests = vec![
-            VmTestCase {
-                input: "true",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "false",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 < 2",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "1 > 2",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 < 1",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 > 1",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 == 1",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "1 != 1",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 == 2",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "1 != 2",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "true == true",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "false == false",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "true == false",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "true != false",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "false != true",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "(1 < 2) == true",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "(1 < 2) == false",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "(1 > 2) == true",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "!true",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "!false",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "!5",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "!!true",
-                expected: Box::new(true),
-            },
-            VmTestCase {
-                input: "!!false",
-                expected: Box::new(false),
-            },
-            VmTestCase {
-                input: "!!5",
-                expected: Box::new(true),
-            },
+            vm_test_case!("true", Box::new(true)),
+            vm_test_case!("false", Box::new(false)),
+            vm_test_case!("1 < 2", Box::new(true)),
+            vm_test_case!("1 > 2", Box::new(false)),
+            vm_test_case!("1 < 1", Box::new(false)),
+            vm_test_case!("1 > 1", Box::new(false)),
+            vm_test_case!("1 == 1", Box::new(true)),
+            vm_test_case!("1 != 1", Box::new(false)),
+            vm_test_case!("1 == 2", Box::new(false)),
+            vm_test_case!("1 != 2", Box::new(true)),
+            vm_test_case!("true == true", Box::new(true)),
+            vm_test_case!("false == false", Box::new(true)),
+            vm_test_case!("true == false", Box::new(false)),
+            vm_test_case!("true != false", Box::new(true)),
+            vm_test_case!("false != true", Box::new(true)),
+            vm_test_case!("(1 < 2) == true", Box::new(true)),
+            vm_test_case!("(1 < 2) == false", Box::new(false)),
+            vm_test_case!("(1 > 2) == true", Box::new(false)),
+            vm_test_case!("!true", Box::new(false)),
+            vm_test_case!("!false", Box::new(true)),
+            vm_test_case!("!5", Box::new(false)),
+            vm_test_case!("!!true", Box::new(true)),
+            vm_test_case!("!!false", Box::new(false)),
+            vm_test_case!("!!5", Box::new(true)),
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_conditional() {
+        let tests = vec![
+            vm_test_case!("if (true) { 10 }", Box::new(10.0f64)),
+            vm_test_case!("if (true) { 10 } else { 20 }", Box::new(10.0f64)),
+            vm_test_case!("if (false) { 10 } else { 20 }", Box::new(20.0f64)),
+            vm_test_case!("if (1) { 10 }", Box::new(10.0f64)),
+            vm_test_case!("if (1 < 2) { 10 }", Box::new(10.0f64)),
+            vm_test_case!("if (1 < 2) { 10 } else { 20 }", Box::new(10.0f64)),
+            vm_test_case!("if (1 > 2) { 10 } else { 20 }", Box::new(20.0f64)),
         ];
 
         run_vm_tests(tests);

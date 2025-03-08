@@ -266,7 +266,7 @@ mod test {
     }
 
     struct CompilerTestCase {
-        input: String,
+        input: &'static str,
         expected_constants: Vec<CompilerInterface>,
         expected_instructions: Vec<code::Instructions>,
     }
@@ -326,21 +326,31 @@ mod test {
         }
     }
 
+    macro_rules! compiler_test_case {
+        ($input:expr, $constants:expr, $instructions:expr) => {{
+            CompilerTestCase {
+                input: $input,
+                expected_constants: $constants,
+                expected_instructions: $instructions,
+            }
+        }};
+    }
+
     #[test]
     fn test_integer_arithmetic() {
         let tests = vec![
-            CompilerTestCase {
-                input: "1 + 2".to_string(),
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+            compiler_test_case!(
+                "1 + 2",
+                vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
                     code::make(&code::OP_CONSTANT, Some(vec![1u16])),
                     code::make(&code::OP_ADD, NONE),
                     code::make(&code::OP_POP, NONE),
-                ],
-            },
+                ]
+            ),
             CompilerTestCase {
-                input: "1; 2".to_string(),
+                input: "1; 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -350,7 +360,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 - 2".to_string(),
+                input: "1 - 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -360,7 +370,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 * 2".to_string(),
+                input: "1 * 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -370,7 +380,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "2 / 1".to_string(),
+                input: "2 / 1",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -380,7 +390,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "-1".to_string(),
+                input: "-1",
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -397,7 +407,7 @@ mod test {
     fn test_boolean_expressions() {
         let tests = vec![
             CompilerTestCase {
-                input: "true".to_string(),
+                input: "true",
                 expected_constants: vec![],
                 expected_instructions: vec![
                     code::make(&code::OP_TRUE, NONE),
@@ -405,7 +415,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "false".to_string(),
+                input: "false",
                 expected_constants: vec![],
                 expected_instructions: vec![
                     code::make(&code::OP_FALSE, NONE),
@@ -413,7 +423,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 > 2".to_string(),
+                input: "1 > 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -423,7 +433,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 < 2".to_string(),
+                input: "1 < 2",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -433,7 +443,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 == 2".to_string(),
+                input: "1 == 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -443,7 +453,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "1 != 2".to_string(),
+                input: "1 != 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
@@ -453,7 +463,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "true != false".to_string(),
+                input: "true != false",
                 expected_constants: vec![],
                 expected_instructions: vec![
                     code::make(&code::OP_TRUE, NONE),
@@ -463,7 +473,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "!true".to_string(),
+                input: "!true",
                 expected_constants: vec![],
                 expected_instructions: vec![
                     code::make(&code::OP_TRUE, NONE),
@@ -480,7 +490,7 @@ mod test {
     fn test_conditionals() {
         let tests = vec![
             CompilerTestCase {
-                input: "if (true) { 10 }; 3333;".to_string(),
+                input: "if (true) { 10 }; 3333;",
                 expected_constants: vec![
                     CompilerInterface::Int(10.0),
                     CompilerInterface::Int(3333.0),
@@ -495,7 +505,7 @@ mod test {
                 ],
             },
             CompilerTestCase {
-                input: "if (true) { 10 } else { 20 }; 3333;".to_string(),
+                input: "if (true) { 10 } else { 20 }; 3333;",
                 expected_constants: vec![
                     CompilerInterface::Int(10.0),
                     CompilerInterface::Int(20.0),
