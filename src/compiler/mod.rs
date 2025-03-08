@@ -127,25 +127,24 @@ impl Compiler {
                     self.remove_last_pop();
                 }
 
+                // emit a jump with a bogus value
+                let jump_position = self.emit(&code::OP_JUMP, vec![9999]);
+
+                let after_consequence_position = self.instructions.len();
+                self.change_operand(jump_not_truthy, after_consequence_position);
+
                 if let Some(alternative) = alternative {
-                    // emit a jump with a bogus value
-                    let jump_position = self.emit(&code::OP_JUMP, vec![9999]);
-
-                    let after_consequence_position = self.instructions.len();
-                    self.change_operand(jump_not_truthy, after_consequence_position);
-
                     self.compile_block_statement(alternative)?;
 
                     if self.last_instruction_is_pop() {
                         self.remove_last_pop();
                     }
-
-                    let after_alternative_position = self.instructions.len();
-                    self.change_operand(jump_position, after_alternative_position);
                 } else {
-                    let after_consequence_position = self.instructions.len();
-                    self.change_operand(jump_not_truthy, after_consequence_position);
+                    self.emit(&code::OP_NULL, vec![]);
                 }
+
+                let after_alternative_position = self.instructions.len();
+                self.change_operand(jump_position, after_alternative_position);
             }
             _ => todo!(),
         }
@@ -497,8 +496,10 @@ mod test {
                 ],
                 expected_instructions: vec![
                     code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![7u16])),
+                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![10u16])),
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_JUMP, Some(vec![11u16])),
+                    code::make(&code::OP_NULL, NONE),
                     code::make(&code::OP_POP, NONE),
                     code::make(&code::OP_CONSTANT, Some(vec![1u16])),
                     code::make(&code::OP_POP, NONE),

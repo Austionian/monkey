@@ -7,6 +7,7 @@ use crate::{
 const STACK_SIZE: usize = 2048;
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
+const NULL: ObjectType = ObjectType::NullObj;
 
 pub struct VM {
     constants: Vec<ObjectType>,
@@ -65,6 +66,7 @@ impl VM {
                         ip = pos as usize - 1;
                     }
                 }
+                code::OP_NULL => self.push(NULL)?,
                 _ => todo!(),
             }
 
@@ -77,6 +79,8 @@ impl VM {
     fn is_truthy(obj: ObjectType) -> bool {
         if let ObjectType::BoolObj(value) = obj {
             value
+        } else if let ObjectType::NullObj = obj {
+            false
         } else {
             true
         }
@@ -97,6 +101,7 @@ impl VM {
 
         match operand {
             ObjectType::BoolObj(b) => self.push(ObjectType::BoolObj(!b)),
+            ObjectType::NullObj => self.push(ObjectType::BoolObj(true)),
             _ => self.push(ObjectType::BoolObj(false)),
         }
     }
@@ -230,6 +235,14 @@ mod test {
             return;
         }
 
+        // Special null case, probably should be last
+        if expected.is::<ObjectType>() {
+            if *actual != NULL {
+                panic!("object is not null: {expected:?}");
+            }
+            return;
+        }
+
         panic!("expected f64");
     }
 
@@ -302,6 +315,7 @@ mod test {
             vm_test_case!("!!true", Box::new(true)),
             vm_test_case!("!!false", Box::new(false)),
             vm_test_case!("!!5", Box::new(true)),
+            vm_test_case!("!(if (false) { 5; })", Box::new(true)),
         ];
 
         run_vm_tests(tests);
@@ -317,6 +331,12 @@ mod test {
             vm_test_case!("if (1 < 2) { 10 }", Box::new(10.0f64)),
             vm_test_case!("if (1 < 2) { 10 } else { 20 }", Box::new(10.0f64)),
             vm_test_case!("if (1 > 2) { 10 } else { 20 }", Box::new(20.0f64)),
+            vm_test_case!("if (1 > 2) { 10 }", Box::new(NULL)),
+            vm_test_case!("if (false) { 10 }", Box::new(NULL)),
+            vm_test_case!(
+                "if ((if (false) { 10 })) { 10 } else { 20 }",
+                Box::new(20.0f64)
+            ),
         ];
 
         run_vm_tests(tests);

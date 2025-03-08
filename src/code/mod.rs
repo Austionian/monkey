@@ -26,6 +26,7 @@ pub const OP_MINUS: Opcode = 11;
 pub const OP_BANG: Opcode = 12;
 pub const OP_JUMP: Opcode = 13;
 pub const OP_JUMP_NOT_TRUTHY: Opcode = 14;
+pub const OP_NULL: Opcode = 15;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -100,6 +101,7 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_BANG);
     op_definition!(OP_JUMP, 2);
     op_definition!(OP_JUMP_NOT_TRUTHY, 2);
+    op_definition!(OP_NULL);
 
     definitions
 });
