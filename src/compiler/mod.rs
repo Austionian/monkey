@@ -326,10 +326,14 @@ mod test {
     }
 
     macro_rules! compiler_test_case {
-        ($input:expr, $constants:expr, $instructions:expr) => {{
+        ($input:expr, $instructions:expr, ($($constant:expr), +)) => {{
+            let mut expected_constants = Vec::new();
+            $(
+                expected_constants.push(CompilerInterface::Int($constant));
+            )+
             CompilerTestCase {
                 input: $input,
-                expected_constants: $constants,
+                expected_constants,
                 expected_instructions: $instructions,
             }
         }};
@@ -340,13 +344,13 @@ mod test {
         let tests = vec![
             compiler_test_case!(
                 "1 + 2",
-                vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 vec![
                     code::make(&code::OP_CONSTANT, Some(vec![0u16])),
                     code::make(&code::OP_CONSTANT, Some(vec![1u16])),
                     code::make(&code::OP_ADD, NONE),
                     code::make(&code::OP_POP, NONE),
-                ]
+                ],
+                (1.0, 2.0)
             ),
             CompilerTestCase {
                 input: "1; 2",
