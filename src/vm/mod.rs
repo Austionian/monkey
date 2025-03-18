@@ -264,7 +264,7 @@ mod test {
         ($input:expr, $expected:expr) => {{
             VmTestCase {
                 input: $input,
-                expected: $expected,
+                expected: Box::new($expected),
             }
         }};
     }
@@ -272,17 +272,17 @@ mod test {
     #[test]
     fn test_integer_arithmetic() {
         let tests: Vec<VmTestCase> = vec![
-            vm_test_case!("1", Box::new(1.0f64)),
-            vm_test_case!("2", Box::new(2.0f64)),
-            vm_test_case!("1 + 2", Box::new(3.0f64)),
-            vm_test_case!("1 - 2", Box::new(-1.0f64)),
-            vm_test_case!("1 * 2", Box::new(2.0f64)),
-            vm_test_case!("2 / 1", Box::new(2.0f64)),
-            vm_test_case!("5 * (2 + 10)", Box::new(60.0f64)),
-            vm_test_case!("-5", Box::new(-5.0f64)),
-            vm_test_case!("-10", Box::new(-10.0f64)),
-            vm_test_case!("-50 + 100 + -50", Box::new(0.0f64)),
-            vm_test_case!("(5 + 10 * 2 + 15 / 3) * 2 + -10", Box::new(50.0f64)),
+            vm_test_case!("1", 1.0f64),
+            vm_test_case!("2", 2.0f64),
+            vm_test_case!("1 + 2", 3.0f64),
+            vm_test_case!("1 - 2", -1.0f64),
+            vm_test_case!("1 * 2", 2.0f64),
+            vm_test_case!("2 / 1", 2.0f64),
+            vm_test_case!("5 * (2 + 10)", 60.0f64),
+            vm_test_case!("-5", -5.0f64),
+            vm_test_case!("-10", -10.0f64),
+            vm_test_case!("-50 + 100 + -50", 0.0f64),
+            vm_test_case!("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50.0f64),
         ];
 
         run_vm_tests(tests);
@@ -291,31 +291,31 @@ mod test {
     #[test]
     fn test_bool_expressions() {
         let tests = vec![
-            vm_test_case!("true", Box::new(true)),
-            vm_test_case!("false", Box::new(false)),
-            vm_test_case!("1 < 2", Box::new(true)),
-            vm_test_case!("1 > 2", Box::new(false)),
-            vm_test_case!("1 < 1", Box::new(false)),
-            vm_test_case!("1 > 1", Box::new(false)),
-            vm_test_case!("1 == 1", Box::new(true)),
-            vm_test_case!("1 != 1", Box::new(false)),
-            vm_test_case!("1 == 2", Box::new(false)),
-            vm_test_case!("1 != 2", Box::new(true)),
-            vm_test_case!("true == true", Box::new(true)),
-            vm_test_case!("false == false", Box::new(true)),
-            vm_test_case!("true == false", Box::new(false)),
-            vm_test_case!("true != false", Box::new(true)),
-            vm_test_case!("false != true", Box::new(true)),
-            vm_test_case!("(1 < 2) == true", Box::new(true)),
-            vm_test_case!("(1 < 2) == false", Box::new(false)),
-            vm_test_case!("(1 > 2) == true", Box::new(false)),
-            vm_test_case!("!true", Box::new(false)),
-            vm_test_case!("!false", Box::new(true)),
-            vm_test_case!("!5", Box::new(false)),
-            vm_test_case!("!!true", Box::new(true)),
-            vm_test_case!("!!false", Box::new(false)),
-            vm_test_case!("!!5", Box::new(true)),
-            vm_test_case!("!(if (false) { 5; })", Box::new(true)),
+            vm_test_case!("true", true),
+            vm_test_case!("false", false),
+            vm_test_case!("1 < 2", true),
+            vm_test_case!("1 > 2", false),
+            vm_test_case!("1 < 1", false),
+            vm_test_case!("1 > 1", false),
+            vm_test_case!("1 == 1", true),
+            vm_test_case!("1 != 1", false),
+            vm_test_case!("1 == 2", false),
+            vm_test_case!("1 != 2", true),
+            vm_test_case!("true == true", true),
+            vm_test_case!("false == false", true),
+            vm_test_case!("true == false", false),
+            vm_test_case!("true != false", true),
+            vm_test_case!("false != true", true),
+            vm_test_case!("(1 < 2) == true", true),
+            vm_test_case!("(1 < 2) == false", false),
+            vm_test_case!("(1 > 2) == true", false),
+            vm_test_case!("!true", false),
+            vm_test_case!("!false", true),
+            vm_test_case!("!5", false),
+            vm_test_case!("!!true", true),
+            vm_test_case!("!!false", false),
+            vm_test_case!("!!5", true),
+            vm_test_case!("!(if (false) { 5; })", true),
         ];
 
         run_vm_tests(tests);
@@ -324,19 +324,16 @@ mod test {
     #[test]
     fn test_conditional() {
         let tests = vec![
-            vm_test_case!("if (true) { 10 }", Box::new(10.0f64)),
-            vm_test_case!("if (true) { 10 } else { 20 }", Box::new(10.0f64)),
-            vm_test_case!("if (false) { 10 } else { 20 }", Box::new(20.0f64)),
-            vm_test_case!("if (1) { 10 }", Box::new(10.0f64)),
-            vm_test_case!("if (1 < 2) { 10 }", Box::new(10.0f64)),
-            vm_test_case!("if (1 < 2) { 10 } else { 20 }", Box::new(10.0f64)),
-            vm_test_case!("if (1 > 2) { 10 } else { 20 }", Box::new(20.0f64)),
-            vm_test_case!("if (1 > 2) { 10 }", Box::new(NULL)),
-            vm_test_case!("if (false) { 10 }", Box::new(NULL)),
-            vm_test_case!(
-                "if ((if (false) { 10 })) { 10 } else { 20 }",
-                Box::new(20.0f64)
-            ),
+            vm_test_case!("if (true) { 10 }", 10.0f64),
+            vm_test_case!("if (true) { 10 } else { 20 }", 10.0f64),
+            vm_test_case!("if (false) { 10 } else { 20 }", 20.0f64),
+            vm_test_case!("if (1) { 10 }", 10.0f64),
+            vm_test_case!("if (1 < 2) { 10 }", 10.0f64),
+            vm_test_case!("if (1 < 2) { 10 } else { 20 }", 10.0f64),
+            vm_test_case!("if (1 > 2) { 10 } else { 20 }", 20.0f64),
+            vm_test_case!("if (1 > 2) { 10 }", NULL),
+            vm_test_case!("if (false) { 10 }", NULL),
+            vm_test_case!("if ((if (false) { 10 })) { 10 } else { 20 }", 20.0f64),
         ];
 
         run_vm_tests(tests);

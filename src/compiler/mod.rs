@@ -53,9 +53,9 @@ impl Compiler {
                 self.emit(&OP_POP, vec![]);
                 Ok(())
             }
-            ast::Statement::LetStatement(exp) => Ok(Compiler::compile_let_statement(exp)?),
-            ast::Statement::BlockStatement(exp) => Ok(Compiler::compile_block(exp)?),
-            ast::Statement::ReturnStatement(exp) => Ok(Compiler::compile_return(exp)?),
+            ast::Statement::LetStatement(exp) => Ok(self.compile_let_statement(exp)?),
+            ast::Statement::BlockStatement(exp) => Ok(Self::compile_block(exp)?),
+            ast::Statement::ReturnStatement(exp) => Ok(Self::compile_return(exp)?),
         }
     }
 
@@ -238,8 +238,11 @@ impl Compiler {
         pos_new_instruction
     }
 
-    fn compile_let_statement(statement: &ast::LetStatement) -> Result<(), CompilerError> {
-        todo!()
+    fn compile_let_statement(
+        &mut self,
+        statement: &ast::LetStatement,
+    ) -> Result<(), CompilerError> {
+        self.compile_expression(&statement.value)
     }
 
     pub fn bytecode(self) -> ByteCode {
@@ -524,6 +527,56 @@ mod test {
                     code::make(&code::OP_CONSTANT, Some(vec![1u16])),
                     code::make(&code::OP_POP, NONE),
                     code::make(&code::OP_CONSTANT, Some(vec![2u16])),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+        ];
+
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = vec![
+            CompilerTestCase {
+                input: r#"
+                let one = 1;
+                let two = 2;
+                "#,
+                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
+                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
+                    code::make(&code::OP_SET_GLOBAL, Some(vec![1u16])),
+                ],
+            },
+            CompilerTestCase {
+                input: r#"
+                let one = 1;
+                one;
+                "#,
+                expected_constants: vec![CompilerInterface::Int(1.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
+                    code::make(&code::OP_GET_GLOBAL, Some(vec![0u16])),
+                    code::make(&code::OP_POP, NONE),
+                ],
+            },
+            CompilerTestCase {
+                input: r#"
+                let one = 1;
+                let two = one;
+                two;
+                "#,
+                expected_constants: vec![CompilerInterface::Int(1.0)],
+                expected_instructions: vec![
+                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
+                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
+                    code::make(&code::OP_GET_GLOBAL, Some(vec![0u16])),
+                    code::make(&code::OP_SET_GLOBAL, Some(vec![1u16])),
+                    code::make(&code::OP_GET_GLOBAL, Some(vec![1u16])),
                     code::make(&code::OP_POP, NONE),
                 ],
             },
