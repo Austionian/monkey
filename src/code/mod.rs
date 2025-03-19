@@ -2,14 +2,12 @@ use std::{
     cell::LazyCell,
     clone::Clone,
     collections::HashMap,
-    fmt::Display,
     io::{Cursor, Seek, Write},
 };
 
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
 
-pub const NONE: Option<Vec<u8>> = None;
 // TODO: Should these just be an enum?
 pub const OP_CONSTANT: Opcode = 0;
 pub const OP_ADD: Opcode = 1;
@@ -160,13 +158,28 @@ impl Fixed for usize {
     }
 }
 
-pub fn make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
+#[allow(dead_code)] // this isn't really dead'
+pub fn internal_make_no_operands(op: &Opcode) -> Vec<u8> {
+    if let Some(def) = DEFINITIONS.get(op) {
+        let mut instruction_len = 1;
+
+        for w in def.operand_widths.iter() {
+            instruction_len += w;
+        }
+
+        let mut instruction = vec![0u8; instruction_len.into()];
+        instruction[0] = *op;
+
+        instruction
+    } else {
+        vec![]
+    }
+}
+
+pub fn internal_make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
     op: &Opcode,
-    operands: Option<impl IntoIterator<Item = T>>,
-) -> Vec<u8>
-where
-    T: Display,
-{
+    operands: impl IntoIterator<Item = T>,
+) -> Vec<u8> {
     if let Some(def) = DEFINITIONS.get(op) {
         let mut instruction_len = 1;
 
@@ -178,21 +191,33 @@ where
         instruction[0] = *op;
 
         let mut offset = 1;
-        if let Some(operands) = operands {
-            for (i, o) in operands.into_iter().enumerate() {
-                let width = def.operand_widths[i];
-                let mut cursor = Cursor::new(&mut instruction);
-                cursor.seek_relative(offset as i64).unwrap();
-                cursor.write_all(&o.to_be_bytes()).unwrap();
 
-                offset += width;
-            }
+        for (i, o) in operands.into_iter().enumerate() {
+            let width = def.operand_widths[i];
+            let mut cursor = Cursor::new(&mut instruction);
+            cursor.seek_relative(offset as i64).unwrap();
+            cursor.write_all(&o.to_be_bytes()).unwrap();
+
+            offset += width;
         }
 
         instruction
     } else {
         vec![]
     }
+}
+
+pub mod make {
+    macro_rules! it {
+        ($op:expr) => {
+            $crate::code::internal_make_no_operands($op)
+        };
+        ($op:expr, $operands:expr) => {
+            $crate::code::internal_make($op, $operands)
+        };
+    }
+
+    pub(crate) use it;
 }
 
 pub fn read_u16(ins: &[u8]) -> u16 {
@@ -277,7 +302,7 @@ mod test {
         ];
 
         for test in tests {
-            let instruction = make(&test.op, Some(test.operands));
+            let instruction = make::it!(&test.op, test.operands);
 
             assert_eq!(instruction.len(), test.expected.len());
 
@@ -290,9 +315,9 @@ mod test {
     #[test]
     fn test_instructions_string() {
         let instructions: Vec<Instructions> = vec![
-            make(&OP_ADD, NONE),
-            make(&OP_CONSTANT, Some(vec![2u16])),
-            make(&OP_CONSTANT, Some(vec![65535u16])),
+            make::it!(&OP_ADD),
+            make::it!(&OP_CONSTANT, vec![2u16]),
+            make::it!(&OP_CONSTANT, vec![65535u16]),
         ];
 
         let expected = r#"0000 OpAdd
@@ -324,7 +349,7 @@ mod test {
         }];
 
         for t in tests.iter() {
-            let instruction = make(&t.op, Some(t.operands.clone()));
+            let instruction = make::it!(&t.op, t.operands.clone());
             let def = look_up(&t.op).unwrap();
 
             let (operands_read, n) = read_operands(&def, &instruction[1..]);

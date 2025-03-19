@@ -1,6 +1,7 @@
+mod symbol_table;
 use crate::{
     ast,
-    code::{self, Opcode, DEFINITIONS, OP_CONSTANT, OP_FALSE, OP_POP, OP_TRUE},
+    code::{self, make, Opcode, DEFINITIONS, OP_CONSTANT, OP_FALSE, OP_POP, OP_TRUE},
     object,
     token::Token,
 };
@@ -186,7 +187,7 @@ impl Compiler {
             for width in def.operand_widths.iter() {
                 match width {
                     2 => {
-                        ins = code::make(op, Some(operands.iter().map(|x| *x as u16)));
+                        ins = make::it!(op, operands.iter().map(|x| *x as u16));
                     }
                     _ => todo!(),
                 };
@@ -209,7 +210,7 @@ impl Compiler {
 
     fn change_operand(&mut self, op_position: usize, operand: usize) {
         let op = self.instructions[op_position];
-        let new_instruction = code::make(&op, Some(vec![operand as u16]));
+        let new_instruction = make::it!(&op, vec![operand as u16]);
 
         self.replace_instruction(op_position, new_instruction);
     }
@@ -257,7 +258,6 @@ impl Compiler {
 mod test {
     use super::*;
     use crate::{code::instruction_to_string, lexer::Lexer, parser::Parser, test_setup};
-    use code::NONE;
     use core::panic;
     use object::ObjectType;
 
@@ -312,7 +312,6 @@ mod test {
             match constant {
                 CompilerInterface::Int(x) => test_integer_object(*x, &actual[i]),
                 CompilerInterface::Bool(b) => test_bool_object(*b, &actual[i]),
-                _ => todo!(),
             }
         }
     }
@@ -348,10 +347,10 @@ mod test {
             compiler_test_case!(
                 "1 + 2",
                 vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_ADD, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_ADD),
+                    make::it!(&code::OP_POP),
                 ],
                 (1.0, 2.0)
             ),
@@ -359,49 +358,49 @@ mod test {
                 input: "1; 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_POP, NONE),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_POP),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "1 - 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_SUB, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_SUB),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "1 * 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_MUL, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_MUL),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "2 / 1",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_DIV, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_DIV),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "-1",
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_MINUS, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_MINUS),
+                    make::it!(&code::OP_POP),
                 ],
             },
         ];
@@ -415,76 +414,70 @@ mod test {
             CompilerTestCase {
                 input: "true",
                 expected_constants: vec![],
-                expected_instructions: vec![
-                    code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_POP, NONE),
-                ],
+                expected_instructions: vec![make::it!(&code::OP_TRUE), make::it!(&code::OP_POP)],
             },
             CompilerTestCase {
                 input: "false",
                 expected_constants: vec![],
-                expected_instructions: vec![
-                    code::make(&code::OP_FALSE, NONE),
-                    code::make(&code::OP_POP, NONE),
-                ],
+                expected_instructions: vec![make::it!(&code::OP_FALSE), make::it!(&code::OP_POP)],
             },
             CompilerTestCase {
                 input: "1 > 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_GREATER_THAN, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_GREATER_THAN),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "1 < 2",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_GREATER_THAN, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_GREATER_THAN),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "1 == 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_EQUAL, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_EQUAL),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "1 != 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_NOT_EQUAL, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_NOT_EQUAL),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "true != false",
                 expected_constants: vec![],
                 expected_instructions: vec![
-                    code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_FALSE, NONE),
-                    code::make(&code::OP_NOT_EQUAL, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_TRUE),
+                    make::it!(&code::OP_FALSE),
+                    make::it!(&code::OP_NOT_EQUAL),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
                 input: "!true",
                 expected_constants: vec![],
                 expected_instructions: vec![
-                    code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_BANG, NONE),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_TRUE),
+                    make::it!(&code::OP_BANG),
+                    make::it!(&code::OP_POP),
                 ],
             },
         ];
@@ -502,14 +495,14 @@ mod test {
                     CompilerInterface::Int(3333.0),
                 ],
                 expected_instructions: vec![
-                    code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![10u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_JUMP, Some(vec![11u16])),
-                    code::make(&code::OP_NULL, NONE),
-                    code::make(&code::OP_POP, NONE),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_TRUE),
+                    make::it!(&code::OP_JUMP_NOT_TRUTHY, vec![10u16]),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_JUMP, vec![11u16]),
+                    make::it!(&code::OP_NULL),
+                    make::it!(&code::OP_POP),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
@@ -520,14 +513,14 @@ mod test {
                     CompilerInterface::Int(3333.0),
                 ],
                 expected_instructions: vec![
-                    code::make(&code::OP_TRUE, NONE),
-                    code::make(&code::OP_JUMP_NOT_TRUTHY, Some(vec![10u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_JUMP, Some(vec![13u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_POP, NONE),
-                    code::make(&code::OP_CONSTANT, Some(vec![2u16])),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_TRUE),
+                    make::it!(&code::OP_JUMP_NOT_TRUTHY, vec![10u16]),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_JUMP, vec![13u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_POP),
+                    make::it!(&code::OP_CONSTANT, vec![2u16]),
+                    make::it!(&code::OP_POP),
                 ],
             },
         ];
@@ -545,10 +538,10 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
-                    code::make(&code::OP_CONSTANT, Some(vec![1u16])),
-                    code::make(&code::OP_SET_GLOBAL, Some(vec![1u16])),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_SET_GLOBAL, vec![1u16]),
                 ],
             },
             CompilerTestCase {
@@ -558,10 +551,10 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
-                    code::make(&code::OP_GET_GLOBAL, Some(vec![0u16])),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
+                    make::it!(&code::OP_GET_GLOBAL, vec![0u16]),
+                    make::it!(&code::OP_POP),
                 ],
             },
             CompilerTestCase {
@@ -572,12 +565,12 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    code::make(&code::OP_CONSTANT, Some(vec![0u16])),
-                    code::make(&code::OP_SET_GLOBAL, Some(vec![0u16])),
-                    code::make(&code::OP_GET_GLOBAL, Some(vec![0u16])),
-                    code::make(&code::OP_SET_GLOBAL, Some(vec![1u16])),
-                    code::make(&code::OP_GET_GLOBAL, Some(vec![1u16])),
-                    code::make(&code::OP_POP, NONE),
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
+                    make::it!(&code::OP_GET_GLOBAL, vec![0u16]),
+                    make::it!(&code::OP_SET_GLOBAL, vec![1u16]),
+                    make::it!(&code::OP_GET_GLOBAL, vec![1u16]),
+                    make::it!(&code::OP_POP),
                 ],
             },
         ];
