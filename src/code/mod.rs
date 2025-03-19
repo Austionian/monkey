@@ -208,6 +208,12 @@ pub fn internal_make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
 }
 
 pub mod make {
+    /// Allows me to not have to operands when none are needed
+    /// to make and removes the need to put the operands in an
+    /// option.
+    ///
+    /// TODO: make it so that operands don't need to wrapped in a
+    /// vec if it's a one item vec.
     macro_rules! it {
         ($op:expr) => {
             $crate::code::internal_make_no_operands($op)
