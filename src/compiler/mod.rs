@@ -8,14 +8,14 @@ use crate::{
 use symbol_table::SymbolTable;
 use thiserror::Error;
 
-pub struct Compiler<'a> {
+pub struct Compiler<'a, 'b> {
     pub instructions: code::Instructions,
     pub constants: &'a mut Vec<object::ObjectType>,
     // very last instruction
     pub last_instruction: EmittedInstruction,
     // instruction before last_instruction
     pub previous_instruction: EmittedInstruction,
-    pub symbol_table: &'a mut SymbolTable<'a>,
+    pub symbol_table: &'a mut SymbolTable<'b>,
 }
 
 pub struct Environment<'a> {
@@ -50,8 +50,11 @@ pub enum CompilerError {
     InvalidToken(Token),
 }
 
-impl<'a> Compiler<'a> {
-    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'a>) -> Self {
+impl<'a, 'b> Compiler<'a, 'b> {
+    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'b>) -> Self
+    where
+        'b: 'a,
+    {
         Self {
             instructions: Vec::new(),
             constants,

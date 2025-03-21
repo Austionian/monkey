@@ -6,7 +6,7 @@ use crate::{
 use anyhow;
 
 const STACK_SIZE: usize = 2048;
-const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
+pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
@@ -15,24 +15,18 @@ pub struct VM<'a> {
     constants: &'a mut Vec<ObjectType>,
     instructions: code::Instructions,
     stack: [ObjectType; STACK_SIZE],
-    globals: [ObjectType; GLOBAL_SIZE],
+    globals: &'a mut [ObjectType; GLOBAL_SIZE],
     // stack pointer
     sp: usize,
 }
 
-impl<'a> From<Compiler<'a>> for VM<'a> {
-    fn from(value: Compiler<'a>) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'a> VM<'a> {
-    fn new(compiler: Compiler<'a>) -> Self {
+impl<'a, 'b> VM<'a> {
+    pub fn new(compiler: Compiler<'a, 'b>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
         VM {
             constants: compiler.constants,
             instructions: compiler.instructions,
             stack: [const { ObjectType::NullObj }; STACK_SIZE],
-            globals: [const { ObjectType::NullObj }; GLOBAL_SIZE],
+            globals,
             sp: 0,
         }
     }
@@ -153,8 +147,11 @@ impl<'a> VM<'a> {
     }
 
     fn execute_binary_operation(&mut self, op: &Opcode) -> anyhow::Result<()> {
-        if let ObjectType::IntegerObj(right) = self.pop() {
-            if let ObjectType::IntegerObj(left) = self.pop() {
+        let right = self.pop();
+        let left = self.pop();
+        println!("{right:?}, {left:?}");
+        if let ObjectType::IntegerObj(right) = right {
+            if let ObjectType::IntegerObj(left) = left {
                 self.execute_binary_int_operation(op, left, right)?;
             } else {
                 todo!();
@@ -236,10 +233,11 @@ mod test {
             let mut constants = Vec::new();
             let mut symbol_table = SymbolTable::new();
             let mut comp = Compiler::new(&mut constants, &mut symbol_table);
+            let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
 
             comp.compile(program).unwrap();
 
-            let mut vm = VM::new(comp);
+            let mut vm = VM::new(comp, &mut globals);
             vm.run().unwrap();
 
             let stack_elem = vm.last_popped_stack_elem();

@@ -1,12 +1,9 @@
 use crate::{
-    compiler::{
-        symbol_table::{self, SymbolTable},
-        Compiler,
-    },
+    compiler::{symbol_table::SymbolTable, Compiler},
     lexer,
-    object::{Environment, Object, ObjectType},
+    object::{Object, ObjectType},
     parser::Parser,
-    vm::VM,
+    vm::{GLOBAL_SIZE, VM},
 };
 use std::{
     io::{self, Write},
@@ -15,9 +12,15 @@ use std::{
 
 const PROMPT: &'static str = ">> ";
 
-pub fn start<'a, 'b>(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'b>)
-where
-    'a: 'b,
+pub fn start<'a, 'b>(
+    constants: &'a mut Vec<ObjectType>,
+    // 'b outlives 'a but this probably isn't sustainable because 'b is pretty
+    // much static here. New scope will be thrown away on subsequent iterations
+    // of the loop, but they'll still probably be expected to have 'b lifetime
+    symbol_table: &'a mut SymbolTable<'b>,
+    globals: &mut [ObjectType; GLOBAL_SIZE],
+) where
+    'b: 'a,
 {
     print!("{PROMPT}");
     let _ = io::stdout().flush();
@@ -61,7 +64,7 @@ where
             eprintln!("woops! compilation failed");
         }
 
-        let mut machine: VM = comp.into();
+        let mut machine: VM = VM::new(comp, globals);
         if let Err(e) = machine.run() {
             eprintln!("whoops! executing the bytecode failed:, {e}");
         }
