@@ -3,8 +3,10 @@ use crate::{
     compiler::ByteCode,
     object::ObjectType,
 };
+use anyhow;
 
 const STACK_SIZE: usize = 2048;
+const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
@@ -13,6 +15,7 @@ pub struct VM {
     constants: Vec<ObjectType>,
     instructions: code::Instructions,
     stack: [ObjectType; STACK_SIZE],
+    globals: [ObjectType; GLOBAL_SIZE],
     // stack pointer
     sp: usize,
 }
@@ -23,11 +26,19 @@ impl VM {
             constants: bytecode.constants,
             instructions: bytecode.instructions,
             stack: [const { ObjectType::NullObj }; STACK_SIZE],
+            globals: [const { ObjectType::NullObj }; GLOBAL_SIZE],
             sp: 0,
         }
     }
 
-    pub fn run(&mut self) -> Result<(), String> {
+    pub fn new_with_globals_store(bytecode: ByteCode, s: [ObjectType; GLOBAL_SIZE]) -> Self {
+        let mut vm = Self::new(bytecode);
+        vm.globals = s;
+
+        vm
+    }
+
+    pub fn run(&mut self) -> anyhow::Result<()> {
         // ip = 'instruction pointer'
         let mut ip = 0;
         while ip < self.instructions.len() {
@@ -67,6 +78,16 @@ impl VM {
                     }
                 }
                 code::OP_NULL => self.push(NULL)?,
+                code::OP_SET_GLOBAL => {
+                    let global_index = code::read_u16(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    self.globals[global_index as usize] = self.pop();
+                }
+                code::OP_GET_GLOBAL => {
+                    let global_index = code::read_u16(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    self.push(self.globals[global_index as usize].clone())?;
+                }
                 _ => todo!(),
             }
 
@@ -86,17 +107,17 @@ impl VM {
         }
     }
 
-    fn execute_minus_operator(&mut self) -> Result<(), String> {
+    fn execute_minus_operator(&mut self) -> anyhow::Result<()> {
         let operand = self.pop();
 
         if let ObjectType::IntegerObj(value) = operand {
             self.push(ObjectType::IntegerObj(-value))
         } else {
-            Err(format!("Unsupported type for negation: {}", operand))
+            anyhow::bail!("Unsupported type for negation: {}", operand)
         }
     }
 
-    fn execute_bang_operator(&mut self) -> Result<(), String> {
+    fn execute_bang_operator(&mut self) -> anyhow::Result<()> {
         let operand = self.pop();
 
         match operand {
@@ -106,7 +127,7 @@ impl VM {
         }
     }
 
-    fn execute_comparison(&mut self, op: &Opcode) -> Result<(), String> {
+    fn execute_comparison(&mut self, op: &Opcode) -> anyhow::Result<()> {
         let right = self.pop();
         let left = self.pop();
 
@@ -119,20 +140,20 @@ impl VM {
         match op {
             &code::OP_EQUAL => self.push(ObjectType::BoolObj(right == left)),
             &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(right != left)),
-            _ => Err(format!("Unknown operator: {}", op)),
+            _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
 
-    fn execute_int_comparison(&mut self, op: &Opcode, left: f64, right: f64) -> Result<(), String> {
+    fn execute_int_comparison(&mut self, op: &Opcode, left: f64, right: f64) -> anyhow::Result<()> {
         match op {
             &code::OP_GREATER_THAN => self.push(ObjectType::BoolObj(left > right)),
             &code::OP_EQUAL => self.push(ObjectType::BoolObj(left == right)),
             &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(left != right)),
-            _ => Err(format!("Unknown operator: {}", op)),
+            _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
 
-    fn execute_binary_operation(&mut self, op: &Opcode) -> Result<(), String> {
+    fn execute_binary_operation(&mut self, op: &Opcode) -> anyhow::Result<()> {
         if let ObjectType::IntegerObj(right) = self.pop() {
             if let ObjectType::IntegerObj(left) = self.pop() {
                 self.execute_binary_int_operation(op, left, right)?;
@@ -151,20 +172,20 @@ impl VM {
         op: &Opcode,
         left: f64,
         right: f64,
-    ) -> Result<(), String> {
+    ) -> anyhow::Result<()> {
         match op {
             &code::OP_ADD => self.push(ObjectType::IntegerObj(left + right)),
             &code::OP_SUB => self.push(ObjectType::IntegerObj(left - right)),
             &code::OP_MUL => self.push(ObjectType::IntegerObj(left * right)),
             &code::OP_DIV => self.push(ObjectType::IntegerObj(left / right)),
 
-            _ => return Err(format!("Unsupported integer operator: {}", op)),
+            _ => anyhow::bail!("Unsupported integer operator: {}", op),
         }
     }
 
-    fn push(&mut self, o: ObjectType) -> Result<(), String> {
+    fn push(&mut self, o: ObjectType) -> anyhow::Result<()> {
         if self.sp >= STACK_SIZE {
-            return Err("stack overflow".to_string());
+            anyhow::bail!("stack overflow".to_string());
         }
 
         self.stack[self.sp] = o;
@@ -337,5 +358,14 @@ mod test {
         ];
 
         run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        run_vm_tests(vec![
+            vm_test_case!("let one = 1; one", 1.0f64),
+            vm_test_case!("let one = 1; let two = 2; one + two", 3.0f64),
+            vm_test_case!("let one = 1; let two = one + one; one + two", 3.0f64),
+        ]);
     }
 }

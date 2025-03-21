@@ -1,6 +1,5 @@
 use crate::{
     compiler::Compiler,
-    evaluator::eval_program,
     lexer,
     object::{Environment, Object},
     parser::Parser,

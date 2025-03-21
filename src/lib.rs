@@ -1,10 +1,10 @@
 mod ast;
 mod code;
-mod compiler;
+pub mod compiler;
 mod evaluator;
 mod lexer;
 pub mod object;
 mod parser;
 pub mod repl;
 mod token;
-mod vm;
+pub mod vm;

@@ -1,18 +1,35 @@
-mod symbol_table;
+pub mod symbol_table;
 use crate::{
     ast,
     code::{self, make, Opcode, DEFINITIONS, OP_CONSTANT, OP_FALSE, OP_POP, OP_TRUE},
-    object,
+    object::{self, ObjectType},
     token::Token,
 };
+use symbol_table::SymbolTable;
+use thiserror::Error;
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     pub instructions: code::Instructions,
     pub constants: Vec<object::ObjectType>,
     // very last instruction
     pub last_instruction: EmittedInstruction,
     // instruction before last_instruction
     pub previous_instruction: EmittedInstruction,
+    pub symbol_table: SymbolTable<'a>,
+}
+
+pub struct Environment<'a> {
+    pub constants: Vec<object::ObjectType>,
+    pub symbol_table: SymbolTable<'a>,
+}
+
+impl<'a> Environment<'a> {
+    pub fn new() -> Self {
+        Self {
+            constants: Vec::new(),
+            symbol_table: SymbolTable::new(),
+        }
+    }
 }
 
 #[derive(Default, Clone)]
@@ -26,17 +43,31 @@ pub struct ByteCode {
     pub constants: Vec<object::ObjectType>,
 }
 
-#[derive(Debug)]
-pub struct CompilerError {}
+#[derive(Error, Debug)]
+pub enum CompilerError {
+    #[error("undefined variable")]
+    UndefinedVariable,
+    #[error("invalid token {0:?}")]
+    InvalidToken(Token),
+}
 
-impl Compiler {
+impl<'a> Compiler<'a> {
     pub fn new() -> Self {
         Self {
             instructions: Vec::new(),
             constants: Vec::new(),
             last_instruction: EmittedInstruction::default(),
             previous_instruction: EmittedInstruction::default(),
+            symbol_table: SymbolTable::new(),
         }
+    }
+
+    pub fn new_with_state(symbol_table: SymbolTable<'a>, constants: Vec<ObjectType>) -> Self {
+        let mut compiler = Self::new();
+        compiler.symbol_table = symbol_table;
+        compiler.constants = constants;
+
+        compiler
     }
 
     pub fn compile(&mut self, node: ast::Program) -> Result<(), CompilerError> {
@@ -147,6 +178,18 @@ impl Compiler {
                 let after_alternative_position = self.instructions.len();
                 self.change_operand(jump_position, after_alternative_position);
             }
+            ast::Expression::IdentExpression(ident) => {
+                let name = if let Token::IDENT(name) = ident {
+                    name
+                } else {
+                    return Err(CompilerError::InvalidToken(ident.clone()));
+                };
+                let symbol = self
+                    .symbol_table
+                    .resolve(name)
+                    .ok_or(CompilerError::UndefinedVariable)?;
+                self.emit(&code::OP_GET_GLOBAL, vec![symbol.index]);
+            }
             _ => todo!(),
         }
 
@@ -243,7 +286,16 @@ impl Compiler {
         &mut self,
         statement: &ast::LetStatement,
     ) -> Result<(), CompilerError> {
-        self.compile_expression(&statement.value)
+        self.compile_expression(&statement.value)?;
+
+        let name = if let Token::IDENT(name) = &statement.name {
+            name
+        } else {
+            return Err(CompilerError::InvalidToken(statement.name.clone()));
+        };
+        let symbol = self.symbol_table.define(name.to_string());
+        self.emit(&code::OP_SET_GLOBAL, vec![symbol.index]);
+        Ok(())
     }
 
     pub fn bytecode(self) -> ByteCode {

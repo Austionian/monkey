@@ -8,10 +8,10 @@ const SCOPE: [u8; 6] = *b"GLOBAL";
 const GLOBAL_SCOPE: SymbolScope = unsafe { from_utf8_unchecked(&SCOPE) };
 
 #[derive(Debug, Clone)]
-struct Symbol<'a> {
+pub struct Symbol<'a> {
     name: String,
     scope: SymbolScope<'a>,
-    index: usize,
+    pub index: usize,
 }
 
 impl<'a> PartialEq for Symbol<'a> {
@@ -21,7 +21,7 @@ impl<'a> PartialEq for Symbol<'a> {
 }
 
 #[derive(Debug)]
-struct SymbolTable<'a> {
+pub struct SymbolTable<'a> {
     store: HashMap<String, Symbol<'a>>,
     num_definitions: usize,
 }
@@ -34,13 +34,13 @@ impl<'a> SymbolTable<'a> {
         }
     }
 
-    pub fn define(&mut self, name: &'a str) -> Symbol<'a> {
+    pub fn define(&mut self, name: String) -> Symbol<'a> {
         let symbol = Symbol {
-            name: name.to_string(),
+            name: name.clone(),
             index: self.num_definitions,
             scope: GLOBAL_SCOPE,
         };
-        self.store.insert(name.to_string(), symbol.clone());
+        self.store.insert(name, symbol.clone());
         self.num_definitions += 1;
 
         symbol
@@ -76,15 +76,15 @@ mod test {
         );
 
         let mut global = SymbolTable::new();
-        assert_eq!(global.define("a"), *expected.get("a").unwrap());
-        assert_eq!(global.define("b"), *expected.get("b").unwrap());
+        assert_eq!(global.define("a".to_string()), *expected.get("a").unwrap());
+        assert_eq!(global.define("b".to_string()), *expected.get("b").unwrap());
     }
 
     #[test]
     fn test_resolve_global() {
         let mut global = SymbolTable::new();
-        global.define("a");
-        global.define("b");
+        global.define("a".to_string());
+        global.define("b".to_string());
 
         let expected = vec![
             Symbol {
