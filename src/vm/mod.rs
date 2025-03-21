@@ -1,6 +1,6 @@
 use crate::{
     code::{self, Opcode},
-    compiler::{ByteCode, Compiler},
+    compiler::Compiler,
     object::ObjectType,
 };
 use anyhow;
@@ -147,18 +147,39 @@ impl<'a> VM<'a> {
     fn execute_binary_operation(&mut self, op: &Opcode) -> anyhow::Result<()> {
         let right = self.pop();
         let left = self.pop();
-        println!("{right:?}, {left:?}");
-        if let ObjectType::IntegerObj(right) = right {
-            if let ObjectType::IntegerObj(left) = left {
-                self.execute_binary_int_operation(op, left, right)?;
-            } else {
-                todo!();
-            };
-        } else {
-            todo!();
-        };
+
+        match left {
+            ObjectType::IntegerObj(left) => match right {
+                ObjectType::IntegerObj(right) => {
+                    self.execute_binary_int_operation(op, left, right)?;
+                }
+                _ => todo!(),
+            },
+            ObjectType::StringObj(left) => match right {
+                ObjectType::StringObj(right) => {
+                    self.execute_string_operation(op, left, right)?;
+                }
+                _ => todo!(),
+            },
+            _ => todo!(),
+        }
 
         Ok(())
+    }
+
+    fn execute_string_operation(
+        &mut self,
+        op: &Opcode,
+        mut left: String,
+        right: String,
+    ) -> anyhow::Result<()> {
+        match *op {
+            code::OP_ADD => {
+                left.push_str(&right);
+                self.push(ObjectType::StringObj(left))
+            }
+            _ => anyhow::bail!("Unsupported string operator: {}", op),
+        }
     }
 
     fn execute_binary_int_operation(
@@ -252,6 +273,10 @@ mod test {
             test_bool_object(*expected.downcast::<bool>().unwrap(), actual);
             return;
         }
+        if expected.is::<&'static str>() {
+            test_string_object(*expected.downcast::<&'static str>().unwrap(), actual);
+            return;
+        }
 
         // Special null case, probably should be last
         if expected.is::<ObjectType>() {
@@ -262,6 +287,13 @@ mod test {
         }
 
         panic!("expected f64");
+    }
+
+    fn test_string_object(expected: &str, actual: &ObjectType) {
+        match actual {
+            ObjectType::StringObj(s) => assert_eq!(expected, *s),
+            _ => panic!("expected a string object"),
+        }
     }
 
     fn test_bool_object(expected: bool, actual: &object::ObjectType) {
@@ -363,6 +395,15 @@ mod test {
             vm_test_case!("let one = 1; one", 1.0f64),
             vm_test_case!("let one = 1; let two = 2; one + two", 3.0f64),
             vm_test_case!("let one = 1; let two = one + one; one + two", 3.0f64),
+        ]);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        run_vm_tests(vec![
+            vm_test_case!(r#""monkey""#, "monkey"),
+            vm_test_case!(r#""mon" + "key""#, "monkey"),
+            vm_test_case!(r#""mon" + "key" + "banana""#, "monkeybanana"),
         ]);
     }
 }

@@ -184,6 +184,10 @@ impl<'a, 'b> Compiler<'a, 'b> {
                     .ok_or(CompilerError::UndefinedVariable)?;
                 self.emit(&code::OP_GET_GLOBAL, vec![symbol.index]);
             }
+            ast::Expression::StringExpression(string) => {
+                let i = self.add_constant(string.to_owned().into());
+                self.emit(&code::OP_CONSTANT, vec![i]);
+            }
             _ => todo!(),
         }
 
@@ -310,6 +314,7 @@ mod test {
     enum CompilerInterface {
         Int(f64),
         Bool(bool),
+        String(&'static str),
     }
 
     struct CompilerTestCase {
@@ -350,6 +355,13 @@ mod test {
         }
     }
 
+    fn test_string_object(expected: &str, actual: &object::ObjectType) {
+        match actual {
+            ObjectType::StringObj(s) => assert_eq!(expected, *s),
+            _ => panic!("expected only string objects"),
+        }
+    }
+
     fn test_constants(expected: Vec<CompilerInterface>, actual: &mut Vec<ObjectType>) {
         assert_eq!(expected.len(), actual.len());
 
@@ -357,6 +369,7 @@ mod test {
             match constant {
                 CompilerInterface::Int(x) => test_integer_object(*x, &actual[i]),
                 CompilerInterface::Bool(b) => test_bool_object(*b, &actual[i]),
+                CompilerInterface::String(s) => test_string_object(*s, &actual[i]),
             }
         }
     }
@@ -625,5 +638,32 @@ mod test {
         ];
 
         run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        run_compiler_tests(vec![
+            CompilerTestCase {
+                input: r#""monkey""#,
+                expected_constants: vec![CompilerInterface::String("monkey")],
+                expected_instructions: vec![
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_POP),
+                ],
+            },
+            CompilerTestCase {
+                input: r#""mon" + "key""#,
+                expected_constants: vec![
+                    CompilerInterface::String("mon"),
+                    CompilerInterface::String("key"),
+                ],
+                expected_instructions: vec![
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_ADD),
+                    make::it!(&code::OP_POP),
+                ],
+            },
+        ]);
     }
 }

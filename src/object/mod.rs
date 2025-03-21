@@ -46,6 +46,7 @@ impl From<Token> for ObjectType {
             Token::INT(t) => Self::IntegerObj(t as f64),
             Token::FALSE => Self::BoolObj(false),
             Token::TRUE => Self::BoolObj(true),
+            Token::STRING(s) => Self::StringObj(s),
             _ => todo!(),
         }
     }
