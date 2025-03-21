@@ -20,8 +20,8 @@ pub struct VM<'a> {
     sp: usize,
 }
 
-impl<'a, 'b> VM<'a> {
-    pub fn new(compiler: Compiler<'a, 'b>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
+impl<'a> VM<'a> {
+    pub fn new(compiler: Compiler<'a, '_>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
         VM {
             constants: compiler.constants,
             instructions: compiler.instructions,
@@ -93,10 +93,8 @@ impl<'a, 'b> VM<'a> {
     fn is_truthy(obj: ObjectType) -> bool {
         if let ObjectType::BoolObj(value) = obj {
             value
-        } else if let ObjectType::NullObj = obj {
-            false
         } else {
-            true
+            !matches!(obj, ObjectType::NullObj)
         }
     }
 
@@ -130,18 +128,18 @@ impl<'a, 'b> VM<'a> {
             }
         }
 
-        match op {
-            &code::OP_EQUAL => self.push(ObjectType::BoolObj(right == left)),
-            &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(right != left)),
+        match *op {
+            code::OP_EQUAL => self.push(ObjectType::BoolObj(right == left)),
+            code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(right != left)),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
 
     fn execute_int_comparison(&mut self, op: &Opcode, left: f64, right: f64) -> anyhow::Result<()> {
-        match op {
-            &code::OP_GREATER_THAN => self.push(ObjectType::BoolObj(left > right)),
-            &code::OP_EQUAL => self.push(ObjectType::BoolObj(left == right)),
-            &code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(left != right)),
+        match *op {
+            code::OP_GREATER_THAN => self.push(ObjectType::BoolObj(left > right)),
+            code::OP_EQUAL => self.push(ObjectType::BoolObj(left == right)),
+            code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(left != right)),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
@@ -169,11 +167,11 @@ impl<'a, 'b> VM<'a> {
         left: f64,
         right: f64,
     ) -> anyhow::Result<()> {
-        match op {
-            &code::OP_ADD => self.push(ObjectType::IntegerObj(left + right)),
-            &code::OP_SUB => self.push(ObjectType::IntegerObj(left - right)),
-            &code::OP_MUL => self.push(ObjectType::IntegerObj(left * right)),
-            &code::OP_DIV => self.push(ObjectType::IntegerObj(left / right)),
+        match *op {
+            code::OP_ADD => self.push(ObjectType::IntegerObj(left + right)),
+            code::OP_SUB => self.push(ObjectType::IntegerObj(left - right)),
+            code::OP_MUL => self.push(ObjectType::IntegerObj(left * right)),
+            code::OP_DIV => self.push(ObjectType::IntegerObj(left / right)),
 
             _ => anyhow::bail!("Unsupported integer operator: {}", op),
         }
