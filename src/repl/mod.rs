@@ -1,7 +1,10 @@
 use crate::{
-    compiler::Compiler,
+    compiler::{
+        symbol_table::{self, SymbolTable},
+        Compiler,
+    },
     lexer,
-    object::{Environment, Object},
+    object::{Environment, Object, ObjectType},
     parser::Parser,
     vm::VM,
 };
@@ -12,7 +15,10 @@ use std::{
 
 const PROMPT: &'static str = ">> ";
 
-pub fn start(env: &mut Environment) {
+pub fn start<'a, 'b>(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'b>)
+where
+    'a: 'b,
+{
     print!("{PROMPT}");
     let _ = io::stdout().flush();
 
@@ -50,12 +56,12 @@ pub fn start(env: &mut Environment) {
     //}
 
     if let Ok(program) = program {
-        let mut comp = Compiler::new();
+        let mut comp = Compiler::new(constants, symbol_table);
         if let Err(_) = comp.compile(program) {
             eprintln!("woops! compilation failed");
         }
 
-        let mut machine = VM::new(comp.bytecode());
+        let mut machine: VM = comp.into();
         if let Err(e) = machine.run() {
             eprintln!("whoops! executing the bytecode failed:, {e}");
         }

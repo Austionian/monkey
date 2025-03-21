@@ -10,12 +10,12 @@ use thiserror::Error;
 
 pub struct Compiler<'a> {
     pub instructions: code::Instructions,
-    pub constants: Vec<object::ObjectType>,
+    pub constants: &'a mut Vec<object::ObjectType>,
     // very last instruction
     pub last_instruction: EmittedInstruction,
     // instruction before last_instruction
     pub previous_instruction: EmittedInstruction,
-    pub symbol_table: SymbolTable<'a>,
+    pub symbol_table: &'a mut SymbolTable<'a>,
 }
 
 pub struct Environment<'a> {
@@ -40,7 +40,6 @@ pub struct EmittedInstruction {
 
 pub struct ByteCode {
     pub instructions: code::Instructions,
-    pub constants: Vec<object::ObjectType>,
 }
 
 #[derive(Error, Debug)]
@@ -52,22 +51,14 @@ pub enum CompilerError {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new() -> Self {
+    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'a>) -> Self {
         Self {
             instructions: Vec::new(),
-            constants: Vec::new(),
+            constants,
             last_instruction: EmittedInstruction::default(),
             previous_instruction: EmittedInstruction::default(),
-            symbol_table: SymbolTable::new(),
+            symbol_table,
         }
-    }
-
-    pub fn new_with_state(symbol_table: SymbolTable<'a>, constants: Vec<ObjectType>) -> Self {
-        let mut compiler = Self::new();
-        compiler.symbol_table = symbol_table;
-        compiler.constants = constants;
-
-        compiler
     }
 
     pub fn compile(&mut self, node: ast::Program) -> Result<(), CompilerError> {
@@ -301,7 +292,6 @@ impl<'a> Compiler<'a> {
     pub fn bytecode(self) -> ByteCode {
         ByteCode {
             instructions: self.instructions,
-            constants: self.constants,
         }
     }
 }
@@ -357,7 +347,7 @@ mod test {
         }
     }
 
-    fn test_constants(expected: Vec<CompilerInterface>, actual: Vec<ObjectType>) {
+    fn test_constants(expected: Vec<CompilerInterface>, actual: &mut Vec<ObjectType>) {
         assert_eq!(expected.len(), actual.len());
 
         for (i, constant) in expected.iter().enumerate() {
@@ -371,7 +361,11 @@ mod test {
     fn run_compiler_tests(tests: Vec<CompilerTestCase>) {
         for test in tests {
             let program = test_setup!(&test.input);
-            let mut compiler = Compiler::new();
+
+            let mut constants = Vec::new();
+            let mut symbol_table = SymbolTable::new();
+
+            let mut compiler = Compiler::new(&mut constants, &mut symbol_table);
             compiler.compile(program).unwrap();
 
             test_instructions(test.expected_instructions, compiler.instructions);

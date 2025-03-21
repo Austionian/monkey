@@ -1,6 +1,6 @@
 use crate::{
     code::{self, Opcode},
-    compiler::ByteCode,
+    compiler::{ByteCode, Compiler},
     object::ObjectType,
 };
 use anyhow;
@@ -11,8 +11,8 @@ const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
 
-pub struct VM {
-    constants: Vec<ObjectType>,
+pub struct VM<'a> {
+    constants: &'a mut Vec<ObjectType>,
     instructions: code::Instructions,
     stack: [ObjectType; STACK_SIZE],
     globals: [ObjectType; GLOBAL_SIZE],
@@ -20,22 +20,21 @@ pub struct VM {
     sp: usize,
 }
 
-impl VM {
-    pub fn new(bytecode: ByteCode) -> Self {
+impl<'a> From<Compiler<'a>> for VM<'a> {
+    fn from(value: Compiler<'a>) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<'a> VM<'a> {
+    fn new(compiler: Compiler<'a>) -> Self {
         VM {
-            constants: bytecode.constants,
-            instructions: bytecode.instructions,
+            constants: compiler.constants,
+            instructions: compiler.instructions,
             stack: [const { ObjectType::NullObj }; STACK_SIZE],
             globals: [const { ObjectType::NullObj }; GLOBAL_SIZE],
             sp: 0,
         }
-    }
-
-    pub fn new_with_globals_store(bytecode: ByteCode, s: [ObjectType; GLOBAL_SIZE]) -> Self {
-        let mut vm = Self::new(bytecode);
-        vm.globals = s;
-
-        vm
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
@@ -217,7 +216,7 @@ impl VM {
 mod test {
     use super::*;
     use crate::{
-        compiler::Compiler,
+        compiler::{symbol_table::SymbolTable, Compiler},
         lexer::Lexer,
         object::{self, ObjectType},
         parser::Parser,
@@ -234,11 +233,13 @@ mod test {
     fn run_vm_tests(tests: Vec<VmTestCase>) {
         for test in tests {
             let program = test_setup!(&test.input);
-            let mut comp = Compiler::new();
+            let mut constants = Vec::new();
+            let mut symbol_table = SymbolTable::new();
+            let mut comp = Compiler::new(&mut constants, &mut symbol_table);
 
             comp.compile(program).unwrap();
 
-            let mut vm = VM::new(comp.bytecode());
+            let mut vm = VM::new(comp);
             vm.run().unwrap();
 
             let stack_elem = vm.last_popped_stack_elem();
