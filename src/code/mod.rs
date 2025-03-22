@@ -27,6 +27,7 @@ pub const OP_JUMP_NOT_TRUTHY: Opcode = 14;
 pub const OP_NULL: Opcode = 15;
 pub const OP_GET_GLOBAL: Opcode = 16;
 pub const OP_SET_GLOBAL: Opcode = 17;
+pub const OP_ARRAY: Opcode = 18;
 
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -104,6 +105,7 @@ pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| 
     op_definition!(OP_NULL);
     op_definition!(OP_GET_GLOBAL, 2);
     op_definition!(OP_SET_GLOBAL, 2);
+    op_definition!(OP_ARRAY, 2);
 
     definitions
 });

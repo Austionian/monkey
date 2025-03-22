@@ -81,6 +81,15 @@ impl<'a> VM<'a> {
                     ip += 2;
                     self.push(self.globals[global_index as usize].clone())?;
                 }
+                code::OP_ARRAY => {
+                    let num_elements = code::read_u16(&self.instructions[ip + 1..]);
+                    ip += 2;
+
+                    let array = self.build_array(num_elements);
+                    self.sp -= num_elements as usize;
+
+                    self.push(array)?;
+                }
                 _ => todo!(),
             }
 
@@ -88,6 +97,16 @@ impl<'a> VM<'a> {
         }
 
         Ok(())
+    }
+
+    fn build_array(&mut self, num_elements: u16) -> ObjectType {
+        let start_index = self.sp - num_elements as usize;
+        let end_index = self.sp;
+        let mut elements = vec![ObjectType::NullObj; end_index - start_index];
+
+        elements[..(end_index - start_index)].clone_from_slice(&self.stack[start_index..end_index]);
+
+        ObjectType::ArrayObj(elements)
     }
 
     fn is_truthy(obj: ObjectType) -> bool {
@@ -277,6 +296,10 @@ mod test {
             test_string_object(*expected.downcast::<&'static str>().unwrap(), actual);
             return;
         }
+        if expected.is::<Vec<f64>>() {
+            test_array_object(*expected.downcast::<Vec<f64>>().unwrap(), actual);
+            return;
+        }
 
         // Special null case, probably should be last
         if expected.is::<ObjectType>() {
@@ -287,6 +310,18 @@ mod test {
         }
 
         panic!("expected f64");
+    }
+
+    fn test_array_object(expected: Vec<f64>, actual: &ObjectType) {
+        match actual {
+            ObjectType::ArrayObj(objs) => {
+                assert_eq!(expected.len(), objs.len());
+                for (i, obj) in objs.iter().enumerate() {
+                    test_integer_object(expected[i], obj);
+                }
+            }
+            _ => panic!("expected an array object"),
+        }
     }
 
     fn test_string_object(expected: &str, actual: &ObjectType) {
@@ -404,6 +439,15 @@ mod test {
             vm_test_case!(r#""monkey""#, "monkey"),
             vm_test_case!(r#""mon" + "key""#, "monkey"),
             vm_test_case!(r#""mon" + "key" + "banana""#, "monkeybanana"),
+        ]);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        run_vm_tests(vec![
+            vm_test_case!("[]", Vec::<f64>::new()),
+            vm_test_case!("[1, 2, 3]", vec![1.0f64, 2.0f64, 3.0f64]),
+            vm_test_case!("[1 + 2, 3 - 4, 5 * 6]", vec![3.0f64, -1.0f64, 30.0f64]),
         ]);
     }
 }

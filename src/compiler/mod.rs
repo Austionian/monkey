@@ -188,6 +188,13 @@ impl<'a, 'b> Compiler<'a, 'b> {
                 let i = self.add_constant(string.to_owned().into());
                 self.emit(&code::OP_CONSTANT, vec![i]);
             }
+            ast::Expression::ArrayExpression(expressions) => {
+                for expression in expressions {
+                    self.compile_expression(expression)?;
+                }
+
+                self.emit(&code::OP_ARRAY, vec![expressions.len()]);
+            }
             _ => todo!(),
         }
 
@@ -661,6 +668,59 @@ mod test {
                     make::it!(&code::OP_CONSTANT, vec![0u16]),
                     make::it!(&code::OP_CONSTANT, vec![1u16]),
                     make::it!(&code::OP_ADD),
+                    make::it!(&code::OP_POP),
+                ],
+            },
+        ]);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        run_compiler_tests(vec![
+            CompilerTestCase {
+                input: "[]",
+                expected_constants: vec![],
+                expected_instructions: vec![
+                    make::it!(&code::OP_ARRAY, vec![0u16]),
+                    make::it!(&code::OP_POP),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1, 2, 3]",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(3.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_CONSTANT, vec![2u16]),
+                    make::it!(&code::OP_ARRAY, vec![3u16]),
+                    make::it!(&code::OP_POP),
+                ],
+            },
+            CompilerTestCase {
+                input: "[1 + 2, 3 - 4, 5 * 6]",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(3.0),
+                    CompilerInterface::Int(4.0),
+                    CompilerInterface::Int(5.0),
+                    CompilerInterface::Int(6.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&code::OP_CONSTANT, vec![0u16]),
+                    make::it!(&code::OP_CONSTANT, vec![1u16]),
+                    make::it!(&code::OP_ADD),
+                    make::it!(&code::OP_CONSTANT, vec![2u16]),
+                    make::it!(&code::OP_CONSTANT, vec![3u16]),
+                    make::it!(&code::OP_SUB),
+                    make::it!(&code::OP_CONSTANT, vec![4u16]),
+                    make::it!(&code::OP_CONSTANT, vec![5u16]),
+                    make::it!(&code::OP_MUL),
+                    make::it!(&code::OP_ARRAY, vec![3u16]),
                     make::it!(&code::OP_POP),
                 ],
             },
