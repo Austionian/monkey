@@ -1,5 +1,5 @@
 use crate::{
-    code::{self, Opcode},
+    code::{self, Op},
     compiler::Compiler,
     object::ObjectType,
 };
@@ -35,34 +35,32 @@ impl<'a> VM<'a> {
         // ip = 'instruction pointer'
         let mut ip = 0;
         while ip < self.instructions.len() {
-            let op: Opcode = self.instructions[ip];
+            let op: Op = self.instructions[ip].into();
 
             match op {
-                code::OP_CONSTANT => {
+                Op::Constant => {
                     let const_index = code::read_u16(&self.instructions[ip + 1..]);
                     ip += 2;
 
                     // TODO: remove this clone and cast
                     self.push(self.constants[const_index as usize].clone())?;
                 }
-                code::OP_ADD | code::OP_SUB | code::OP_MUL | code::OP_DIV => {
+                Op::Add | code::Op::Sub | code::Op::Mul | code::Op::Div => {
                     self.execute_binary_operation(&op)?
                 }
-                code::OP_POP => {
+                Op::Pop => {
                     self.pop();
                 }
-                code::OP_TRUE => self.push(TRUE)?,
-                code::OP_FALSE => self.push(FALSE)?,
-                code::OP_EQUAL | code::OP_NOT_EQUAL | code::OP_GREATER_THAN => {
-                    self.execute_comparison(&op)?
-                }
-                code::OP_BANG => self.execute_bang_operator()?,
-                code::OP_MINUS => self.execute_minus_operator()?,
-                code::OP_JUMP => {
+                Op::True => self.push(TRUE)?,
+                Op::False => self.push(FALSE)?,
+                Op::Equal | Op::NotEqual | Op::GreaterThan => self.execute_comparison(&op)?,
+                Op::Bang => self.execute_bang_operator()?,
+                Op::Minus => self.execute_minus_operator()?,
+                Op::Jump => {
                     let pos = code::read_u16(&self.instructions[ip + 1..]);
                     ip = pos as usize - 1;
                 }
-                code::OP_JUMP_NOT_TRUTHY => {
+                Op::JumpNotTruthy => {
                     let pos = code::read_u16(&self.instructions[ip + 1..]);
                     ip += 2;
 
@@ -70,18 +68,18 @@ impl<'a> VM<'a> {
                         ip = pos as usize - 1;
                     }
                 }
-                code::OP_NULL => self.push(NULL)?,
-                code::OP_SET_GLOBAL => {
+                Op::Null => self.push(NULL)?,
+                Op::SetGlobal => {
                     let global_index = code::read_u16(&self.instructions[ip + 1..]);
                     ip += 2;
                     self.globals[global_index as usize] = self.pop();
                 }
-                code::OP_GET_GLOBAL => {
+                Op::GetGlobal => {
                     let global_index = code::read_u16(&self.instructions[ip + 1..]);
                     ip += 2;
                     self.push(self.globals[global_index as usize].clone())?;
                 }
-                code::OP_ARRAY => {
+                Op::Array => {
                     let num_elements = code::read_u16(&self.instructions[ip + 1..]);
                     ip += 2;
 
@@ -137,7 +135,7 @@ impl<'a> VM<'a> {
         }
     }
 
-    fn execute_comparison(&mut self, op: &Opcode) -> anyhow::Result<()> {
+    fn execute_comparison(&mut self, op: &Op) -> anyhow::Result<()> {
         let right = self.pop();
         let left = self.pop();
 
@@ -148,22 +146,22 @@ impl<'a> VM<'a> {
         }
 
         match *op {
-            code::OP_EQUAL => self.push(ObjectType::BoolObj(right == left)),
-            code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(right != left)),
+            Op::Equal => self.push(ObjectType::BoolObj(right == left)),
+            Op::NotEqual => self.push(ObjectType::BoolObj(right != left)),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
 
-    fn execute_int_comparison(&mut self, op: &Opcode, left: f64, right: f64) -> anyhow::Result<()> {
+    fn execute_int_comparison(&mut self, op: &Op, left: f64, right: f64) -> anyhow::Result<()> {
         match *op {
-            code::OP_GREATER_THAN => self.push(ObjectType::BoolObj(left > right)),
-            code::OP_EQUAL => self.push(ObjectType::BoolObj(left == right)),
-            code::OP_NOT_EQUAL => self.push(ObjectType::BoolObj(left != right)),
+            Op::GreaterThan => self.push(ObjectType::BoolObj(left > right)),
+            Op::Equal => self.push(ObjectType::BoolObj(left == right)),
+            Op::NotEqual => self.push(ObjectType::BoolObj(left != right)),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
 
-    fn execute_binary_operation(&mut self, op: &Opcode) -> anyhow::Result<()> {
+    fn execute_binary_operation(&mut self, op: &Op) -> anyhow::Result<()> {
         let right = self.pop();
         let left = self.pop();
 
@@ -188,12 +186,12 @@ impl<'a> VM<'a> {
 
     fn execute_string_operation(
         &mut self,
-        op: &Opcode,
+        op: &Op,
         mut left: String,
         right: String,
     ) -> anyhow::Result<()> {
         match *op {
-            code::OP_ADD => {
+            Op::Add => {
                 left.push_str(&right);
                 self.push(ObjectType::StringObj(left))
             }
@@ -203,15 +201,15 @@ impl<'a> VM<'a> {
 
     fn execute_binary_int_operation(
         &mut self,
-        op: &Opcode,
+        op: &Op,
         left: f64,
         right: f64,
     ) -> anyhow::Result<()> {
         match *op {
-            code::OP_ADD => self.push(ObjectType::IntegerObj(left + right)),
-            code::OP_SUB => self.push(ObjectType::IntegerObj(left - right)),
-            code::OP_MUL => self.push(ObjectType::IntegerObj(left * right)),
-            code::OP_DIV => self.push(ObjectType::IntegerObj(left / right)),
+            Op::Add => self.push(ObjectType::IntegerObj(left + right)),
+            Op::Sub => self.push(ObjectType::IntegerObj(left - right)),
+            Op::Mul => self.push(ObjectType::IntegerObj(left * right)),
+            Op::Div => self.push(ObjectType::IntegerObj(left / right)),
 
             _ => anyhow::bail!("Unsupported integer operator: {}", op),
         }
@@ -356,7 +354,7 @@ mod test {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests: Vec<VmTestCase> = vec![
+        run_vm_tests(vec![
             vm_test_case!("1", 1.0f64),
             vm_test_case!("2", 2.0f64),
             vm_test_case!("1 + 2", 3.0f64),
@@ -368,14 +366,12 @@ mod test {
             vm_test_case!("-10", -10.0f64),
             vm_test_case!("-50 + 100 + -50", 0.0f64),
             vm_test_case!("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50.0f64),
-        ];
-
-        run_vm_tests(tests);
+        ]);
     }
 
     #[test]
     fn test_bool_expressions() {
-        let tests = vec![
+        run_vm_tests(vec![
             vm_test_case!("true", true),
             vm_test_case!("false", false),
             vm_test_case!("1 < 2", true),
@@ -401,14 +397,12 @@ mod test {
             vm_test_case!("!!false", false),
             vm_test_case!("!!5", true),
             vm_test_case!("!(if (false) { 5; })", true),
-        ];
-
-        run_vm_tests(tests);
+        ]);
     }
 
     #[test]
     fn test_conditional() {
-        let tests = vec![
+        run_vm_tests(vec![
             vm_test_case!("if (true) { 10 }", 10.0f64),
             vm_test_case!("if (true) { 10 } else { 20 }", 10.0f64),
             vm_test_case!("if (false) { 10 } else { 20 }", 20.0f64),
@@ -419,9 +413,7 @@ mod test {
             vm_test_case!("if (1 > 2) { 10 }", NULL),
             vm_test_case!("if (false) { 10 }", NULL),
             vm_test_case!("if ((if (false) { 10 })) { 10 } else { 20 }", 20.0f64),
-        ];
-
-        run_vm_tests(tests);
+        ]);
     }
 
     #[test]

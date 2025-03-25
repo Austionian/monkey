@@ -1,7 +1,7 @@
 pub mod symbol_table;
 use crate::{
-    ast,
-    code::{self, make, Opcode, DEFINITIONS, OP_CONSTANT, OP_FALSE, OP_POP, OP_TRUE},
+    ast::{self, BlockStatement, Expression, LetStatement, Statement},
+    code::{self, make, Op},
     object::{self, ObjectType},
     token::Token,
 };
@@ -34,7 +34,7 @@ impl<'a> Environment<'a> {
 
 #[derive(Default, Clone)]
 pub struct EmittedInstruction {
-    opcode: Opcode,
+    opcode: Op,
     position: usize,
 }
 
@@ -48,6 +48,164 @@ pub enum CompilerError {
     UndefinedVariable,
     #[error("invalid token {0:?}")]
     InvalidToken(Token),
+}
+
+pub trait Compile {
+    fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError>;
+}
+
+impl Compile for Expression {
+    fn compile(
+        &self,
+        compiler: &mut crate::compiler::Compiler,
+    ) -> Result<(), crate::compiler::CompilerError> {
+        match self {
+            Self::IntExpression(t) => {
+                let integer = t.to_owned().into();
+                let i = compiler.add_constant(integer);
+                let _ = compiler.emit(&code::Op::Constant, vec![i]);
+            }
+            Self::BoolExpression(t) => match t {
+                Token::TRUE => {
+                    compiler.emit(&Op::True, vec![]);
+                }
+                Token::FALSE => {
+                    compiler.emit(&Op::False, vec![]);
+                }
+                _ => unreachable!("Only bools should be in bool expressions"),
+            },
+            Self::InfixExpression((operator, left, right)) => {
+                if operator == &Token::LT {
+                    // Flip the order rather than make an OP_LESS_THAN
+                    right.as_ref().compile(compiler)?;
+                    left.as_ref().compile(compiler)?;
+                    compiler.emit(&Op::GreaterThan, vec![]);
+
+                    return Ok(());
+                }
+                left.as_ref().compile(compiler)?;
+                right.as_ref().compile(compiler)?;
+
+                match operator {
+                    Token::PLUS => compiler.emit(&Op::Add, vec![]),
+                    Token::MINUS => compiler.emit(&Op::Sub, vec![]),
+                    Token::SLASH => compiler.emit(&Op::Div, vec![]),
+                    Token::ASTERISK => compiler.emit(&Op::Mul, vec![]),
+                    Token::GT => compiler.emit(&Op::GreaterThan, vec![]),
+                    Token::EQ => compiler.emit(&Op::Equal, vec![]),
+                    Token::NOT_EQ => compiler.emit(&Op::NotEqual, vec![]),
+                    _ => todo!(),
+                };
+            }
+            Self::PrefixExpression((operator, right)) => {
+                right.as_ref().compile(compiler)?;
+
+                match operator {
+                    Token::BANG => compiler.emit(&Op::Bang, vec![]),
+                    Token::MINUS => compiler.emit(&Op::Minus, vec![]),
+                    _ => todo!(),
+                };
+            }
+            Self::IfExpression(condition, consequence, alternative) => {
+                condition.as_ref().compile(compiler)?;
+
+                // emit with bogus jump value
+                let jump_not_truthy = compiler.emit(&Op::JumpNotTruthy, vec![9999]);
+
+                consequence.as_ref().compile(compiler)?;
+
+                if compiler.last_instruction_is_pop() {
+                    compiler.remove_last_pop();
+                }
+
+                // emit a jump with a bogus value
+                let jump_position = compiler.emit(&Op::Jump, vec![9999]);
+
+                let after_consequence_position = compiler.instructions.len();
+                compiler.change_operand(jump_not_truthy, after_consequence_position);
+
+                if let Some(alternative) = alternative {
+                    alternative.as_ref().compile(compiler)?;
+
+                    if compiler.last_instruction_is_pop() {
+                        compiler.remove_last_pop();
+                    }
+                } else {
+                    compiler.emit(&Op::Null, vec![]);
+                }
+
+                let after_alternative_position = compiler.instructions.len();
+                compiler.change_operand(jump_position, after_alternative_position);
+            }
+            Self::IdentExpression(ident) => {
+                let name = if let Token::IDENT(name) = ident {
+                    name
+                } else {
+                    return Err(CompilerError::InvalidToken(ident.clone()));
+                };
+                let symbol = compiler
+                    .symbol_table
+                    .resolve(name)
+                    .ok_or(CompilerError::UndefinedVariable)?;
+                compiler.emit(&Op::GetGlobal, vec![symbol.index]);
+            }
+            Self::StringExpression(string) => {
+                let i = compiler.add_constant(string.to_owned().into());
+                compiler.emit(&Op::Constant, vec![i]);
+            }
+            Self::ArrayExpression(expressions) => {
+                for expression in expressions {
+                    expression.compile(compiler)?;
+                }
+
+                compiler.emit(&Op::Array, vec![expressions.len()]);
+            }
+            _ => todo!(),
+        }
+
+        Ok(())
+    }
+}
+
+impl Compile for Statement {
+    fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError> {
+        match self {
+            Self::LetStatement(let_statement) => let_statement.compile(compiler),
+            Self::ExpressStatement(expression) => {
+                expression.compile(compiler)?;
+                compiler.emit(&code::Op::Pop, vec![]);
+
+                Ok(())
+            }
+            Self::BlockStatement(block_statement) => block_statement.compile(compiler),
+            Self::ReturnStatement(_return_statement) => todo!(),
+        }
+    }
+}
+
+impl Compile for LetStatement {
+    fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError> {
+        self.value.compile(compiler)?;
+
+        let name = if let Token::IDENT(name) = &self.name {
+            name
+        } else {
+            return Err(CompilerError::InvalidToken(self.name.clone()));
+        };
+        let symbol = compiler.symbol_table.define(name.to_string());
+        compiler.emit(&Op::SetGlobal, vec![symbol.index]);
+        Ok(())
+    }
+}
+
+impl Compile for BlockStatement {
+    fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError> {
+        for statement in self.statements.iter() {
+            statement.compile(compiler)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<'a, 'b> Compiler<'a, 'b> {
@@ -66,147 +224,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
     pub fn compile(&mut self, node: ast::Program) -> Result<(), CompilerError> {
         for statement in node.statements {
-            self.compile_statement(&statement)?;
-        }
-
-        Ok(())
-    }
-
-    fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompilerError> {
-        match statement {
-            ast::Statement::ExpressStatement(exp) => {
-                self.compile_expression(&exp)?;
-                self.emit(&OP_POP, vec![]);
-                Ok(())
-            }
-            ast::Statement::LetStatement(exp) => Ok(self.compile_let_statement(exp)?),
-            ast::Statement::BlockStatement(exp) => Ok(Self::compile_block(exp)?),
-            ast::Statement::ReturnStatement(exp) => Ok(Self::compile_return(exp)?),
-        }
-    }
-
-    fn compile_return(expression: &ast::ReturnStatement) -> Result<(), CompilerError> {
-        todo!()
-    }
-
-    fn compile_block(expression: &ast::BlockStatement) -> Result<(), CompilerError> {
-        todo!()
-    }
-
-    fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompilerError> {
-        match expression {
-            ast::Expression::IntExpression(t) => {
-                let integer = t.to_owned().into();
-                let i = self.add_constant(integer);
-                let _ = self.emit(&OP_CONSTANT, vec![i]);
-            }
-            ast::Expression::BoolExpression(t) => match t {
-                Token::TRUE => {
-                    self.emit(&OP_TRUE, vec![]);
-                }
-                Token::FALSE => {
-                    self.emit(&OP_FALSE, vec![]);
-                }
-                _ => unreachable!("Only bools should be in bool expressions"),
-            },
-            ast::Expression::InfixExpression((operator, left, right)) => {
-                if operator == &Token::LT {
-                    // Flip the order rather than make an OP_LESS_THAN
-                    self.compile_expression(right.as_ref())?;
-                    self.compile_expression(left.as_ref())?;
-                    self.emit(&code::OP_GREATER_THAN, vec![]);
-
-                    return Ok(());
-                }
-                self.compile_expression(left.as_ref())?;
-                self.compile_expression(right.as_ref())?;
-
-                match operator {
-                    Token::PLUS => self.emit(&code::OP_ADD, vec![]),
-                    Token::MINUS => self.emit(&code::OP_SUB, vec![]),
-                    Token::SLASH => self.emit(&code::OP_DIV, vec![]),
-                    Token::ASTERISK => self.emit(&code::OP_MUL, vec![]),
-                    Token::GT => self.emit(&code::OP_GREATER_THAN, vec![]),
-                    Token::EQ => self.emit(&code::OP_EQUAL, vec![]),
-                    Token::NOT_EQ => self.emit(&code::OP_NOT_EQUAL, vec![]),
-                    _ => todo!(),
-                };
-            }
-            ast::Expression::PrefixExpression((operator, right)) => {
-                self.compile_expression(right.as_ref())?;
-
-                match operator {
-                    Token::BANG => self.emit(&code::OP_BANG, vec![]),
-                    Token::MINUS => self.emit(&code::OP_MINUS, vec![]),
-                    _ => todo!(),
-                };
-            }
-            ast::Expression::IfExpression(condition, consequence, alternative) => {
-                self.compile_expression(condition.as_ref())?;
-
-                // emit with bogus jump value
-                let jump_not_truthy = self.emit(&code::OP_JUMP_NOT_TRUTHY, vec![9999]);
-
-                self.compile_block_statement(consequence.as_ref())?;
-
-                if self.last_instruction_is_pop() {
-                    self.remove_last_pop();
-                }
-
-                // emit a jump with a bogus value
-                let jump_position = self.emit(&code::OP_JUMP, vec![9999]);
-
-                let after_consequence_position = self.instructions.len();
-                self.change_operand(jump_not_truthy, after_consequence_position);
-
-                if let Some(alternative) = alternative {
-                    self.compile_block_statement(alternative)?;
-
-                    if self.last_instruction_is_pop() {
-                        self.remove_last_pop();
-                    }
-                } else {
-                    self.emit(&code::OP_NULL, vec![]);
-                }
-
-                let after_alternative_position = self.instructions.len();
-                self.change_operand(jump_position, after_alternative_position);
-            }
-            ast::Expression::IdentExpression(ident) => {
-                let name = if let Token::IDENT(name) = ident {
-                    name
-                } else {
-                    return Err(CompilerError::InvalidToken(ident.clone()));
-                };
-                let symbol = self
-                    .symbol_table
-                    .resolve(name)
-                    .ok_or(CompilerError::UndefinedVariable)?;
-                self.emit(&code::OP_GET_GLOBAL, vec![symbol.index]);
-            }
-            ast::Expression::StringExpression(string) => {
-                let i = self.add_constant(string.to_owned().into());
-                self.emit(&code::OP_CONSTANT, vec![i]);
-            }
-            ast::Expression::ArrayExpression(expressions) => {
-                for expression in expressions {
-                    self.compile_expression(expression)?;
-                }
-
-                self.emit(&code::OP_ARRAY, vec![expressions.len()]);
-            }
-            _ => todo!(),
-        }
-
-        Ok(())
-    }
-
-    fn compile_block_statement(
-        &mut self,
-        block: &ast::BlockStatement,
-    ) -> Result<(), CompilerError> {
-        for statement in block.statements.iter() {
-            self.compile_statement(statement)?;
+            statement.compile(self)?;
         }
 
         Ok(())
@@ -218,35 +236,31 @@ impl<'a, 'b> Compiler<'a, 'b> {
     }
 
     fn last_instruction_is_pop(&self) -> bool {
-        self.last_instruction.opcode == code::OP_POP
+        self.last_instruction.opcode == Op::Pop
     }
 
-    fn add_constant(&mut self, obj: object::ObjectType) -> usize {
+    pub fn add_constant(&mut self, obj: object::ObjectType) -> usize {
         self.constants.push(obj);
         return self.constants.len() - 1;
     }
 
-    fn emit(&mut self, op: &Opcode, operands: Vec<usize>) -> usize {
+    pub fn emit(&mut self, op: &Op, operands: Vec<usize>) -> usize {
         // TODO: this still doesn't make sense, why a vec of ops
         // maybe this should be generic like make? And only the correct
         // sizes get passed in?
         let mut ins: Vec<u8> = vec![];
-        if let Some(def) = DEFINITIONS.get(op) {
-            for width in def.operand_widths.iter() {
-                match width {
-                    2 => {
-                        ins = make::it!(op, operands.iter().map(|x| *x as u16));
-                    }
-                    _ => todo!(),
-                };
-            }
-        } else {
-            panic!("Opcode not found!");
+        for width in op.lookup_widths() {
+            match width {
+                2 => {
+                    ins = make::it!(op, operands.iter().map(|x| *x as u16));
+                }
+                _ => todo!(),
+            };
         }
 
         let pos;
         if operands.is_empty() {
-            pos = self.add_instruction(&mut vec![*op]);
+            pos = self.add_instruction(&mut vec![*op as u8]);
         } else {
             pos = self.add_instruction(&mut ins);
         }
@@ -258,7 +272,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
     fn change_operand(&mut self, op_position: usize, operand: usize) {
         let op = self.instructions[op_position];
-        let new_instruction = make::it!(&op, vec![operand as u16]);
+        let new_instruction = make::it!(&op.into(), vec![operand as u16]);
 
         self.replace_instruction(op_position, new_instruction);
     }
@@ -269,10 +283,10 @@ impl<'a, 'b> Compiler<'a, 'b> {
         }
     }
 
-    fn set_last_instruction(&mut self, opcode: &Opcode, position: usize) {
+    fn set_last_instruction(&mut self, op: &Op, position: usize) {
         let previous = self.last_instruction.clone();
         let last = EmittedInstruction {
-            opcode: *opcode,
+            opcode: *op,
             position,
         };
 
@@ -287,22 +301,6 @@ impl<'a, 'b> Compiler<'a, 'b> {
         pos_new_instruction
     }
 
-    fn compile_let_statement(
-        &mut self,
-        statement: &ast::LetStatement,
-    ) -> Result<(), CompilerError> {
-        self.compile_expression(&statement.value)?;
-
-        let name = if let Token::IDENT(name) = &statement.name {
-            name
-        } else {
-            return Err(CompilerError::InvalidToken(statement.name.clone()));
-        };
-        let symbol = self.symbol_table.define(name.to_string());
-        self.emit(&code::OP_SET_GLOBAL, vec![symbol.index]);
-        Ok(())
-    }
-
     pub fn bytecode(self) -> ByteCode {
         ByteCode {
             instructions: self.instructions,
@@ -313,7 +311,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{code::instruction_to_string, lexer::Lexer, parser::Parser, test_setup};
+    use crate::{lexer::Lexer, parser::Parser, test_setup};
     use core::panic;
     use object::ObjectType;
 
@@ -339,8 +337,8 @@ mod test {
         let concatted = concat_instructions(expected);
 
         assert_eq!(
-            instruction_to_string(&concatted),
-            instruction_to_string(&actual)
+            code::instruction_to_string(&concatted),
+            code::instruction_to_string(&actual)
         );
 
         for (i, instruction) in actual.iter().enumerate() {
@@ -416,10 +414,10 @@ mod test {
             compiler_test_case!(
                 "1 + 2",
                 vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_ADD),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0)
             ),
@@ -427,49 +425,49 @@ mod test {
                 input: "1; 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_POP),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Pop),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "1 - 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_SUB),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Sub),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "1 * 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_MUL),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Mul),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "2 / 1",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_DIV),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Div),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "-1",
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_MINUS),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Minus),
+                    make::it!(&Op::Pop),
                 ],
             },
         ];
@@ -483,70 +481,70 @@ mod test {
             CompilerTestCase {
                 input: "true",
                 expected_constants: vec![],
-                expected_instructions: vec![make::it!(&code::OP_TRUE), make::it!(&code::OP_POP)],
+                expected_instructions: vec![make::it!(&Op::True), make::it!(&code::Op::Pop)],
             },
             CompilerTestCase {
                 input: "false",
                 expected_constants: vec![],
-                expected_instructions: vec![make::it!(&code::OP_FALSE), make::it!(&code::OP_POP)],
+                expected_instructions: vec![make::it!(&Op::False), make::it!(&code::Op::Pop)],
             },
             CompilerTestCase {
                 input: "1 > 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_GREATER_THAN),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::GreaterThan),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "1 < 2",
                 expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_GREATER_THAN),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::GreaterThan),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "1 == 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_EQUAL),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Equal),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "1 != 2",
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_NOT_EQUAL),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::NotEqual),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "true != false",
                 expected_constants: vec![],
                 expected_instructions: vec![
-                    make::it!(&code::OP_TRUE),
-                    make::it!(&code::OP_FALSE),
-                    make::it!(&code::OP_NOT_EQUAL),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::True),
+                    make::it!(&Op::False),
+                    make::it!(&Op::NotEqual),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
                 input: "!true",
                 expected_constants: vec![],
                 expected_instructions: vec![
-                    make::it!(&code::OP_TRUE),
-                    make::it!(&code::OP_BANG),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::True),
+                    make::it!(&Op::Bang),
+                    make::it!(&Op::Pop),
                 ],
             },
         ];
@@ -564,14 +562,14 @@ mod test {
                     CompilerInterface::Int(3333.0),
                 ],
                 expected_instructions: vec![
-                    make::it!(&code::OP_TRUE),
-                    make::it!(&code::OP_JUMP_NOT_TRUTHY, vec![10u16]),
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_JUMP, vec![11u16]),
-                    make::it!(&code::OP_NULL),
-                    make::it!(&code::OP_POP),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::True),
+                    make::it!(&Op::JumpNotTruthy, vec![10u16]),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Jump, vec![11u16]),
+                    make::it!(&Op::Null),
+                    make::it!(&Op::Pop),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
@@ -582,14 +580,14 @@ mod test {
                     CompilerInterface::Int(3333.0),
                 ],
                 expected_instructions: vec![
-                    make::it!(&code::OP_TRUE),
-                    make::it!(&code::OP_JUMP_NOT_TRUTHY, vec![10u16]),
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_JUMP, vec![13u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_POP),
-                    make::it!(&code::OP_CONSTANT, vec![2u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::True),
+                    make::it!(&Op::JumpNotTruthy, vec![10u16]),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Jump, vec![13u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Pop),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
         ];
@@ -607,10 +605,10 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_SET_GLOBAL, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::SetGlobal, vec![1u16]),
                 ],
             },
             CompilerTestCase {
@@ -620,10 +618,10 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
-                    make::it!(&code::OP_GET_GLOBAL, vec![0u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
@@ -634,12 +632,12 @@ mod test {
                 "#,
                 expected_constants: vec![CompilerInterface::Int(1.0)],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_SET_GLOBAL, vec![0u16]),
-                    make::it!(&code::OP_GET_GLOBAL, vec![0u16]),
-                    make::it!(&code::OP_SET_GLOBAL, vec![1u16]),
-                    make::it!(&code::OP_GET_GLOBAL, vec![1u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![1u16]),
+                    make::it!(&Op::GetGlobal, vec![1u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
         ];
@@ -654,8 +652,8 @@ mod test {
                 input: r#""monkey""#,
                 expected_constants: vec![CompilerInterface::String("monkey")],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
@@ -665,10 +663,10 @@ mod test {
                     CompilerInterface::String("key"),
                 ],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_ADD),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::Pop),
                 ],
             },
         ]);
@@ -680,10 +678,7 @@ mod test {
             CompilerTestCase {
                 input: "[]",
                 expected_constants: vec![],
-                expected_instructions: vec![
-                    make::it!(&code::OP_ARRAY, vec![0u16]),
-                    make::it!(&code::OP_POP),
-                ],
+                expected_instructions: vec![make::it!(&Op::Array, vec![0u16]), make::it!(&Op::Pop)],
             },
             CompilerTestCase {
                 input: "[1, 2, 3]",
@@ -693,11 +688,11 @@ mod test {
                     CompilerInterface::Int(3.0),
                 ],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_CONSTANT, vec![2u16]),
-                    make::it!(&code::OP_ARRAY, vec![3u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Array, vec![3u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
             CompilerTestCase {
@@ -711,19 +706,24 @@ mod test {
                     CompilerInterface::Int(6.0),
                 ],
                 expected_instructions: vec![
-                    make::it!(&code::OP_CONSTANT, vec![0u16]),
-                    make::it!(&code::OP_CONSTANT, vec![1u16]),
-                    make::it!(&code::OP_ADD),
-                    make::it!(&code::OP_CONSTANT, vec![2u16]),
-                    make::it!(&code::OP_CONSTANT, vec![3u16]),
-                    make::it!(&code::OP_SUB),
-                    make::it!(&code::OP_CONSTANT, vec![4u16]),
-                    make::it!(&code::OP_CONSTANT, vec![5u16]),
-                    make::it!(&code::OP_MUL),
-                    make::it!(&code::OP_ARRAY, vec![3u16]),
-                    make::it!(&code::OP_POP),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Sub),
+                    make::it!(&Op::Constant, vec![4u16]),
+                    make::it!(&Op::Constant, vec![5u16]),
+                    make::it!(&Op::Mul),
+                    make::it!(&Op::Array, vec![3u16]),
+                    make::it!(&Op::Pop),
                 ],
             },
         ]);
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        run_compiler_tests(vec![]);
     }
 }

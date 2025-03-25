@@ -1,118 +1,13 @@
+mod op;
+
+pub use op::Op;
 use std::{
-    cell::LazyCell,
-    clone::Clone,
-    collections::HashMap,
     io::{Cursor, Seek, Write},
+    mem::transmute,
 };
 
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
-
-// TODO: Should these just be an enum?
-pub const OP_CONSTANT: Opcode = 0;
-pub const OP_ADD: Opcode = 1;
-pub const OP_POP: Opcode = 2;
-pub const OP_SUB: Opcode = 3;
-pub const OP_MUL: Opcode = 4;
-pub const OP_DIV: Opcode = 5;
-pub const OP_TRUE: Opcode = 6;
-pub const OP_FALSE: Opcode = 7;
-pub const OP_EQUAL: Opcode = 8;
-pub const OP_NOT_EQUAL: Opcode = 9;
-pub const OP_GREATER_THAN: Opcode = 10;
-pub const OP_MINUS: Opcode = 11;
-pub const OP_BANG: Opcode = 12;
-pub const OP_JUMP: Opcode = 13;
-pub const OP_JUMP_NOT_TRUTHY: Opcode = 14;
-pub const OP_NULL: Opcode = 15;
-pub const OP_GET_GLOBAL: Opcode = 16;
-pub const OP_SET_GLOBAL: Opcode = 17;
-pub const OP_ARRAY: Opcode = 18;
-
-#[derive(Clone, Debug)]
-pub struct Definition {
-    pub name: String,
-    pub operand_widths: Vec<u8>,
-}
-
-pub const DEFINITIONS: LazyCell<HashMap<Opcode, Definition>> = LazyCell::new(|| {
-    let mut definitions = HashMap::new();
-
-    macro_rules! op_definition {
-        ($val:tt, $widths:expr) => { op_definition!(@ $val, $val, $widths); };
-        (@ $op_ident:ident, $op:expr, $widths:expr) => {{
-            let name = stringify!($op_ident)
-                .to_lowercase()
-                .to_string()
-                .split("_")
-                .map(|v| {
-                    let mut c = v.chars();
-                    match c.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                    }
-                })
-                .collect::<String>();
-
-            definitions.insert(
-                $op,
-                Definition {
-                    name,
-                    operand_widths: vec![$widths],
-                },
-            );
-        }};
-        ($val:tt) => { op_definition!(@@ $val, $val); };
-        (@@ $op_ident:ident, $op:expr) => {{
-            let name = stringify!($op_ident)
-                .to_lowercase()
-                .to_string()
-                .split("_")
-                .map(|v| {
-                    let mut c = v.chars();
-                    match c.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                    }
-                })
-                .collect::<String>();
-
-            definitions.insert(
-                $op,
-                Definition {
-                    name,
-                    operand_widths: vec![],
-                },
-            );
-        }};
-    }
-
-    op_definition!(OP_CONSTANT, 2);
-    op_definition!(OP_ADD);
-    op_definition!(OP_POP);
-    op_definition!(OP_SUB);
-    op_definition!(OP_MUL);
-    op_definition!(OP_DIV);
-    op_definition!(OP_TRUE);
-    op_definition!(OP_FALSE);
-    op_definition!(OP_EQUAL);
-    op_definition!(OP_NOT_EQUAL);
-    op_definition!(OP_GREATER_THAN);
-    op_definition!(OP_MINUS);
-    op_definition!(OP_BANG);
-    op_definition!(OP_JUMP, 2);
-    op_definition!(OP_JUMP_NOT_TRUTHY, 2);
-    op_definition!(OP_NULL);
-    op_definition!(OP_GET_GLOBAL, 2);
-    op_definition!(OP_SET_GLOBAL, 2);
-    op_definition!(OP_ARRAY, 2);
-
-    definitions
-});
-
-fn look_up(op: &Opcode) -> Option<Definition> {
-    DEFINITIONS.get(op).cloned()
-}
 
 pub trait Fixed {
     type Bytes;
@@ -160,62 +55,53 @@ impl Fixed for usize {
     }
 }
 
-#[allow(dead_code)] // this isn't really dead'
-pub fn internal_make_no_operands(op: &Opcode) -> Vec<u8> {
-    if let Some(def) = DEFINITIONS.get(op) {
-        let mut instruction_len = 1;
+#[allow(dead_code)] // this isn't really dead
+pub fn internal_make_no_operands(op: &Op) -> Vec<u8> {
+    let widths = op.lookup_widths();
+    let mut instruction_len = 1;
 
-        for w in def.operand_widths.iter() {
-            instruction_len += w;
-        }
-
-        let mut instruction = vec![0u8; instruction_len.into()];
-        instruction[0] = *op;
-
-        instruction
-    } else {
-        vec![]
+    for w in widths.iter() {
+        instruction_len += w;
     }
+
+    let mut instruction = vec![0u8; instruction_len.into()];
+    instruction[0] = *op as u8;
+
+    instruction
 }
 
 pub fn internal_make<const N: usize, T: Fixed<Bytes = [u8; N]>>(
-    op: &Opcode,
+    op: &Op,
     operands: impl IntoIterator<Item = T>,
 ) -> Vec<u8> {
-    if let Some(def) = DEFINITIONS.get(op) {
-        let mut instruction_len = 1;
+    let def = op.lookup_widths();
+    let mut instruction_len = 1;
 
-        for w in def.operand_widths.iter() {
-            instruction_len += w;
-        }
-
-        let mut instruction = vec![0u8; instruction_len.into()];
-        instruction[0] = *op;
-
-        let mut offset = 1;
-
-        for (i, o) in operands.into_iter().enumerate() {
-            let width = def.operand_widths[i];
-            let mut cursor = Cursor::new(&mut instruction);
-            cursor.seek_relative(offset as i64).unwrap();
-            cursor.write_all(&o.to_be_bytes()).unwrap();
-
-            offset += width;
-        }
-
-        instruction
-    } else {
-        vec![]
+    for w in def.iter() {
+        instruction_len += w;
     }
+
+    let mut instruction = vec![0u8; instruction_len.into()];
+    instruction[0] = *op as u8;
+
+    let mut offset = 1;
+
+    for (i, o) in operands.into_iter().enumerate() {
+        let width = def[i];
+        let mut cursor = Cursor::new(&mut instruction);
+        cursor.seek_relative(offset as i64).unwrap();
+        cursor.write_all(&o.to_be_bytes()).unwrap();
+
+        offset += width;
+    }
+
+    instruction
 }
 
 pub mod make {
     /// Allows me to not have to operands when none are needed
     /// to make and removes the need to put the operands in an
     /// option.
-    ///
-    /// TODO: make it so that operands don't need to wrapped in a
-    /// vec if it's a one item vec.
     macro_rules! it {
         ($op:expr) => {
             $crate::code::internal_make_no_operands($op)
@@ -233,11 +119,12 @@ pub fn read_u16(ins: &[u8]) -> u16 {
     u16::from_be_bytes(arr)
 }
 
-pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<u16>, usize) {
-    let mut operands = vec![0u16; def.operand_widths.len()];
+pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u16>, usize) {
+    let widths = op.lookup_widths();
+    let mut operands = vec![0u16; widths.len()];
     let mut offset = 0;
 
-    for (i, width) in def.operand_widths.iter().enumerate() {
+    for (i, width) in widths.iter().enumerate() {
         match width {
             2 => operands[i] = read_u16(&ins[offset..offset + *width as usize]),
             _ => todo!(),
@@ -254,14 +141,15 @@ pub fn instruction_to_string(ins: &Instructions) -> String {
 
     let mut i = 0;
     while i < ins.len() {
-        let def = look_up(&ins[i]).unwrap();
+        //let def = look_up(&ins[i]).unwrap();
 
-        let (operands, read) = read_operands(&def, &ins[i + 1..]);
+        let op = unsafe { transmute(ins[i]) };
+        let (operands, read) = read_operands(&op, &ins[i + 1..]);
 
         out.push_str(&format!(
             "{:04} {}\n",
             i,
-            format_instruction(&def, operands).unwrap()
+            format_instruction(&op, operands).unwrap()
         ));
 
         i += 1 + read;
@@ -270,16 +158,16 @@ pub fn instruction_to_string(ins: &Instructions) -> String {
     out
 }
 
-fn format_instruction(def: &Definition, operands: Vec<u16>) -> Result<String, String> {
-    let operand_count = def.operand_widths.len();
+fn format_instruction(op: &Op, operands: Vec<u16>) -> Result<String, String> {
+    let operand_count = op.lookup_widths().len();
 
     if operands.len() != operand_count {
         return Err("operand len doesn't match defined len.".to_string());
     }
 
     match operand_count {
-        0 => Ok(format!("{}", def.name)),
-        1 => Ok(format!("{} {}", def.name, operands[0])),
+        0 => Ok(format!("Op{:?}", op)),
+        1 => Ok(format!("Op{:?} {}", op, operands[0])),
         _ => todo!(),
     }
 }
@@ -289,7 +177,7 @@ mod test {
     use super::*;
 
     struct Test {
-        op: Opcode,
+        op: Op,
         operands: Vec<u16>,
         expected: Vec<Opcode>,
     }
@@ -298,14 +186,14 @@ mod test {
     fn test_make() {
         let tests = vec![
             Test {
-                op: OP_CONSTANT,
+                op: Op::Constant,
                 operands: vec![65534],
-                expected: vec![OP_CONSTANT, 255, 254],
+                expected: vec![Op::Constant.into(), 255, 254],
             },
             Test {
-                op: OP_ADD,
+                op: Op::Add,
                 operands: vec![],
-                expected: vec![OP_ADD],
+                expected: vec![Op::Add.into()],
             },
         ];
 
@@ -323,9 +211,9 @@ mod test {
     #[test]
     fn test_instructions_string() {
         let instructions: Vec<Instructions> = vec![
-            make::it!(&OP_ADD),
-            make::it!(&OP_CONSTANT, vec![2u16]),
-            make::it!(&OP_CONSTANT, vec![65535u16]),
+            make::it!(&Op::Add),
+            make::it!(&Op::Constant, vec![2u16]),
+            make::it!(&Op::Constant, vec![65535u16]),
         ];
 
         let expected = r#"0000 OpAdd
@@ -345,22 +233,21 @@ mod test {
     #[test]
     fn test_read_operands() {
         struct Test {
-            op: Opcode,
+            op: Op,
             operands: Vec<u16>,
             bytes_read: usize,
         }
 
         let tests = vec![Test {
-            op: OP_CONSTANT,
+            op: Op::Constant,
             operands: vec![65535],
             bytes_read: 2,
         }];
 
         for t in tests.iter() {
             let instruction = make::it!(&t.op, t.operands.clone());
-            let def = look_up(&t.op).unwrap();
 
-            let (operands_read, n) = read_operands(&def, &instruction[1..]);
+            let (operands_read, n) = read_operands(&t.op, &instruction[1..]);
             assert_eq!(n, t.bytes_read);
 
             for (i, want) in t.operands.iter().enumerate() {
