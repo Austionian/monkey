@@ -160,6 +160,32 @@ impl Compile for Expression {
 
                 compiler.emit(&Op::Array, vec![expressions.len()]);
             }
+            Self::HashLiteral(hash) => {
+                // Sort values in test so the tests can be deterministic
+                #[cfg(test)]
+                {
+                    let mut keys = Vec::new();
+                    for kv in &hash.pairs {
+                        keys.push(kv);
+                    }
+                    keys.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+
+                    for kv in keys {
+                        kv.0.compile(compiler)?;
+                        kv.1.compile(compiler)?;
+                    }
+                }
+
+                #[cfg(not(test))]
+                {
+                    for kv in hash.pairs.iter() {
+                        kv.0.compile(compiler)?;
+                        kv.1.compile(compiler)?;
+                    }
+                }
+
+                compiler.emit(&Op::Hash, vec![hash.pairs.len() * 2]);
+            }
             _ => todo!(),
         }
 
@@ -724,6 +750,56 @@ mod test {
 
     #[test]
     fn test_hash_literals() {
-        run_compiler_tests(vec![]);
+        run_compiler_tests(vec![
+            CompilerTestCase {
+                input: "{}",
+                expected_constants: vec![],
+                expected_instructions: vec![make::it!(&Op::Hash, vec![0u16]), make::it!(&Op::Pop)],
+            },
+            CompilerTestCase {
+                input: "{1: 2, 3: 4, 5: 6}",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(3.0),
+                    CompilerInterface::Int(4.0),
+                    CompilerInterface::Int(5.0),
+                    CompilerInterface::Int(6.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Constant, vec![4u16]),
+                    make::it!(&Op::Constant, vec![5u16]),
+                    make::it!(&Op::Hash, vec![6u16]),
+                    make::it!(&Op::Pop),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2 + 3, 4: 5 * 6}",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(3.0),
+                    CompilerInterface::Int(4.0),
+                    CompilerInterface::Int(5.0),
+                    CompilerInterface::Int(6.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Constant, vec![4u16]),
+                    make::it!(&Op::Constant, vec![5u16]),
+                    make::it!(&Op::Mul),
+                    make::it!(&Op::Hash, vec![4u16]),
+                    make::it!(&Op::Pop),
+                ],
+            },
+        ]);
     }
 }

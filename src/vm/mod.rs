@@ -88,7 +88,9 @@ impl<'a> VM<'a> {
 
                     self.push(array)?;
                 }
-                _ => todo!(),
+                Op::Hash => {
+                    todo!()
+                }
             }
 
             ip += 1;
