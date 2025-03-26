@@ -1,9 +1,10 @@
 use crate::{
     code::{self, Op},
     compiler::Compiler,
-    object::ObjectType,
+    object::{HashPair, ObjectType},
 };
-use anyhow;
+use anyhow::anyhow;
+use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
@@ -89,7 +90,13 @@ impl<'a> VM<'a> {
                     self.push(array)?;
                 }
                 Op::Hash => {
-                    todo!()
+                    let num_elements = code::read_u16(&self.instructions[ip + 1..]);
+                    ip += 2;
+
+                    let hash = self.build_hash(num_elements)?;
+                    self.sp -= num_elements as usize;
+
+                    self.push(hash)?;
                 }
             }
 
@@ -97,6 +104,29 @@ impl<'a> VM<'a> {
         }
 
         Ok(())
+    }
+
+    fn build_hash(&mut self, num_elements: u16) -> anyhow::Result<ObjectType> {
+        let start_index = self.sp - num_elements as usize;
+        let end_index = self.sp;
+
+        let mut hashed_pairs = HashMap::new();
+
+        for i in (start_index..end_index).step_by(2) {
+            let key = self.stack[i].clone();
+            let value = self.stack[i + 1].clone();
+
+            let pair = HashPair {
+                key: key.clone(),
+                value,
+            };
+
+            let hash_key = key.hash().map_err(|_| anyhow!("unusable hash key"))?;
+
+            hashed_pairs.insert(hash_key, pair);
+        }
+
+        Ok(ObjectType::HashObj(hashed_pairs))
     }
 
     fn build_array(&mut self, num_elements: u16) -> ObjectType {
@@ -258,7 +288,7 @@ mod test {
         test_setup,
     };
     use core::panic;
-    use std::any::Any;
+    use std::{any::Any, collections::HashMap};
 
     struct VmTestCase {
         input: &'static str,
@@ -285,20 +315,19 @@ mod test {
 
     fn test_expected_object(expected: Box<dyn Any>, actual: &object::ObjectType) {
         if expected.is::<f64>() {
-            test_integer_object(*expected.downcast::<f64>().unwrap(), actual);
-            return;
+            return test_integer_object(*expected.downcast::<f64>().unwrap(), actual);
         }
         if expected.is::<bool>() {
-            test_bool_object(*expected.downcast::<bool>().unwrap(), actual);
-            return;
+            return test_bool_object(*expected.downcast::<bool>().unwrap(), actual);
         }
         if expected.is::<&'static str>() {
-            test_string_object(*expected.downcast::<&'static str>().unwrap(), actual);
-            return;
+            return test_string_object(*expected.downcast::<&'static str>().unwrap(), actual);
         }
         if expected.is::<Vec<f64>>() {
-            test_array_object(*expected.downcast::<Vec<f64>>().unwrap(), actual);
-            return;
+            return test_array_object(*expected.downcast::<Vec<f64>>().unwrap(), actual);
+        }
+        if expected.is::<HashMap<u64, f64>>() {
+            return test_hash_object(*expected.downcast::<HashMap<u64, f64>>().unwrap(), actual);
         }
 
         // Special null case, probably should be last
@@ -310,6 +339,18 @@ mod test {
         }
 
         panic!("expected f64");
+    }
+
+    fn test_hash_object(expected: HashMap<u64, f64>, actual: &ObjectType) {
+        match actual {
+            ObjectType::HashObj(hash) => {
+                assert_eq!(hash.len(), expected.len());
+                for (expected_key, expected_value) in expected.iter() {
+                    test_integer_object(*expected_value, &hash.get(expected_key).unwrap().value);
+                }
+            }
+            _ => panic!("expected a hash object"),
+        }
     }
 
     fn test_array_object(expected: Vec<f64>, actual: &ObjectType) {
@@ -442,6 +483,22 @@ mod test {
             vm_test_case!("[]", Vec::<f64>::new()),
             vm_test_case!("[1, 2, 3]", vec![1.0f64, 2.0f64, 3.0f64]),
             vm_test_case!("[1 + 2, 3 - 4, 5 * 6]", vec![3.0f64, -1.0f64, 30.0f64]),
+        ]);
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let mut hash1 = HashMap::new();
+        hash1.insert(ObjectType::IntegerObj(1.0).hash().unwrap(), 2.0f64);
+        hash1.insert(ObjectType::IntegerObj(2.0).hash().unwrap(), 3.0f64);
+
+        let mut hash2 = HashMap::new();
+        hash2.insert(ObjectType::IntegerObj(2.0).hash().unwrap(), 4.0f64);
+        hash2.insert(ObjectType::IntegerObj(6.0).hash().unwrap(), 16.0f64);
+
+        run_vm_tests(vec![
+            vm_test_case!("{1: 2, 2: 3}", hash1),
+            vm_test_case!("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", hash2),
         ]);
     }
 }
