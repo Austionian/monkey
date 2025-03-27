@@ -176,6 +176,7 @@ impl Compile for Expression {
                     }
                 }
 
+                // No need to sort when it comes to the real deal
                 #[cfg(not(test))]
                 {
                     for kv in hash.pairs.iter() {
@@ -185,6 +186,11 @@ impl Compile for Expression {
                 }
 
                 compiler.emit(&Op::Hash, vec![hash.pairs.len() * 2]);
+            }
+            Self::IndexExpression(left, index) => {
+                left.compile(compiler)?;
+                index.compile(compiler)?;
+                compiler.emit(&Op::Index, vec![]);
             }
             _ => todo!(),
         }
@@ -797,6 +803,52 @@ mod test {
                     make::it!(&Op::Constant, vec![5u16]),
                     make::it!(&Op::Mul),
                     make::it!(&Op::Hash, vec![4u16]),
+                    make::it!(&Op::Pop),
+                ],
+            },
+        ]);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        run_compiler_tests(vec![
+            CompilerTestCase {
+                input: "[1,2,3][1 + 1]",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(3.0),
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(1.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Array, vec![3u16]),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Constant, vec![4u16]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::Index),
+                    make::it!(&Op::Pop),
+                ],
+            },
+            CompilerTestCase {
+                input: "{1: 2}[2 - 1]",
+                expected_constants: vec![
+                    CompilerInterface::Int(1.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(2.0),
+                    CompilerInterface::Int(1.0),
+                ],
+                expected_instructions: vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Hash, vec![2u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Sub),
+                    make::it!(&Op::Index),
                     make::it!(&Op::Pop),
                 ],
             },

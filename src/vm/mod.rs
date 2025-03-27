@@ -3,7 +3,7 @@ use crate::{
     compiler::Compiler,
     object::{HashPair, ObjectType},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
@@ -98,12 +98,63 @@ impl<'a> VM<'a> {
 
                     self.push(hash)?;
                 }
+                Op::Index => {
+                    let index = self.pop();
+                    let left = self.pop();
+
+                    self.execute_index_expression(left, index)?;
+                }
             }
 
             ip += 1;
         }
 
         Ok(())
+    }
+
+    fn execute_index_expression(
+        &mut self,
+        left: ObjectType,
+        index: ObjectType,
+    ) -> anyhow::Result<()> {
+        match left {
+            ObjectType::ArrayObj(array) => {
+                if let ObjectType::IntegerObj(int) = index {
+                    self.execute_array_index(array, int)
+                } else {
+                    bail!("index operator not supported: {:?}", index)
+                }
+            }
+            ObjectType::HashObj(hash) => self.execute_hash_index(hash, index),
+            _ => bail!("index operator not supported: {:?}", index),
+        }
+    }
+
+    fn execute_hash_index(
+        &mut self,
+        hash: HashMap<u64, HashPair>,
+        index: ObjectType,
+    ) -> anyhow::Result<()> {
+        let key = index.hash().map_err(|err| anyhow!(err))?;
+
+        match hash.get(&key) {
+            Some(pair) => self.push(pair.value.clone()),
+            None => self.push(NULL),
+        }
+    }
+
+    fn execute_array_index(&mut self, array: Vec<ObjectType>, index: f64) -> anyhow::Result<()> {
+        if index < 0.0 || array.len() == 0 {
+            return self.push(NULL);
+        }
+
+        let index = index as usize;
+
+        if index > array.len() - 1 {
+            self.push(NULL)
+        } else {
+            self.push(array.get(index).unwrap_or(&NULL).clone())
+        }
     }
 
     fn build_hash(&mut self, num_elements: u16) -> anyhow::Result<ObjectType> {
@@ -499,6 +550,22 @@ mod test {
         run_vm_tests(vec![
             vm_test_case!("{1: 2, 2: 3}", hash1),
             vm_test_case!("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", hash2),
+        ]);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        run_vm_tests(vec![
+            vm_test_case!("[1, 2, 3][1]", 2f64),
+            vm_test_case!("[1,2,3][0 + 2]", 3f64),
+            vm_test_case!("[[1,1,1]][0][0]", 1f64),
+            vm_test_case!("[][0]", NULL),
+            vm_test_case!("[1,2,3][99]", NULL),
+            vm_test_case!("[1][-1]", NULL),
+            vm_test_case!("{1: 1, 2: 2}[1]", 1f64),
+            vm_test_case!("{1: 1, 2: 2}[2]", 2f64),
+            vm_test_case!("{1: 1}[0]", NULL),
+            vm_test_case!("{}[0]", NULL),
         ]);
     }
 }

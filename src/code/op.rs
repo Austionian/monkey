@@ -32,6 +32,7 @@ pub enum Op {
 
     Array,
     Hash,
+    Index,
 }
 
 impl Into<u8> for Op {
@@ -68,6 +69,7 @@ impl Op {
             | Self::GreaterThan
             | Self::Minus
             | Self::Bang
+            | Self::Index
             | Self::Null => vec![],
 
             Self::Constant
