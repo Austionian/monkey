@@ -144,7 +144,7 @@ impl<'a> VM<'a> {
     }
 
     fn execute_array_index(&mut self, array: Vec<ObjectType>, index: f64) -> anyhow::Result<()> {
-        if index < 0.0 || array.len() == 0 {
+        if index < 0.0 || array.is_empty() {
             return self.push(NULL);
         }
 

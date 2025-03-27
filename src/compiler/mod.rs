@@ -346,18 +346,34 @@ mod test {
     use crate::{lexer::Lexer, parser::Parser, test_setup};
     use core::panic;
     use object::ObjectType;
-
-    #[derive(Debug)]
-    enum CompilerInterface {
-        Int(f64),
-        Bool(bool),
-        String(&'static str),
-    }
+    use std::any::Any;
 
     struct CompilerTestCase {
         input: &'static str,
-        expected_constants: Vec<CompilerInterface>,
+        expected_constants: Vec<Box<dyn Any>>,
         expected_instructions: Vec<code::Instructions>,
+    }
+
+    macro_rules! compiler_test_case {
+        ($input:expr, $instructions:expr) => {{
+            CompilerTestCase {
+                input: $input,
+                expected_constants: Vec::<Box<dyn Any>>::new(),
+                expected_instructions: $instructions,
+            }
+        }};
+
+        ($input:expr, $instructions:expr, ($($constant:expr), +)) => {{
+            let mut expected_constants = Vec::<Box<dyn Any>>::new();
+            $(
+                expected_constants.push(Box::new($constant));
+            )+
+            CompilerTestCase {
+                input: $input,
+                expected_constants,
+                expected_instructions: $instructions,
+            }
+        }};
     }
 
     /// helper function
@@ -399,14 +415,18 @@ mod test {
         }
     }
 
-    fn test_constants(expected: Vec<CompilerInterface>, actual: &mut Vec<ObjectType>) {
+    fn test_constants(expected: Vec<Box<dyn Any>>, actual: &mut Vec<ObjectType>) {
         assert_eq!(expected.len(), actual.len());
 
-        for (i, constant) in expected.iter().enumerate() {
-            match constant {
-                CompilerInterface::Int(x) => test_integer_object(*x, &actual[i]),
-                CompilerInterface::Bool(b) => test_bool_object(*b, &actual[i]),
-                CompilerInterface::String(s) => test_string_object(*s, &actual[i]),
+        for (i, constant) in expected.into_iter().enumerate() {
+            if constant.is::<f64>() {
+                return test_integer_object(*constant.downcast::<f64>().unwrap(), &actual[i]);
+            }
+            if constant.is::<bool>() {
+                return test_bool_object(*constant.downcast::<bool>().unwrap(), &actual[i]);
+            }
+            if constant.is::<&str>() {
+                return test_string_object(*constant.downcast::<&str>().unwrap(), &actual[i]);
             }
         }
     }
@@ -426,23 +446,9 @@ mod test {
         }
     }
 
-    macro_rules! compiler_test_case {
-        ($input:expr, $instructions:expr, ($($constant:expr), +)) => {{
-            let mut expected_constants = Vec::new();
-            $(
-                expected_constants.push(CompilerInterface::Int($constant));
-            )+
-            CompilerTestCase {
-                input: $input,
-                expected_constants,
-                expected_instructions: $instructions,
-            }
-        }};
-    }
-
     #[test]
     fn test_integer_arithmetic() {
-        let tests = vec![
+        run_compiler_tests(vec![
             compiler_test_case!(
                 "1 + 2",
                 vec![
@@ -453,147 +459,135 @@ mod test {
                 ],
                 (1.0, 2.0)
             ),
-            CompilerTestCase {
-                input: "1; 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+            compiler_test_case!(
+                "1; 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Pop),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "1 - 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "1 - 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Sub),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "1 * 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "1 * 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Mul),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "2 / 1",
-                expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "2 / 1",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Div),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "-1",
-                expected_constants: vec![CompilerInterface::Int(1.0)],
-                expected_instructions: vec![
+                (2.0, 1.0)
+            ),
+            compiler_test_case!(
+                "-1",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Minus),
                     make::it!(&Op::Pop),
                 ],
-            },
-        ];
-
-        run_compiler_tests(tests);
+                (1.0)
+            ),
+        ]);
     }
 
     #[test]
     fn test_boolean_expressions() {
-        let tests = vec![
-            CompilerTestCase {
-                input: "true",
-                expected_constants: vec![],
-                expected_instructions: vec![make::it!(&Op::True), make::it!(&code::Op::Pop)],
-            },
-            CompilerTestCase {
-                input: "false",
-                expected_constants: vec![],
-                expected_instructions: vec![make::it!(&Op::False), make::it!(&code::Op::Pop)],
-            },
-            CompilerTestCase {
-                input: "1 > 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                "true",
+                vec![make::it!(&Op::True), make::it!(&code::Op::Pop)]
+            ),
+            compiler_test_case!(
+                "false",
+                vec![make::it!(&Op::False), make::it!(&code::Op::Pop)]
+            ),
+            compiler_test_case!(
+                "1 > 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::GreaterThan),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "1 < 2",
-                expected_constants: vec![CompilerInterface::Int(2.0), CompilerInterface::Int(1.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "1 < 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::GreaterThan),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "1 == 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+                (2.0, 1.0)
+            ),
+            compiler_test_case!(
+                "1 == 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Equal),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "1 != 2",
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "1 != 2",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::NotEqual),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "true != false",
-                expected_constants: vec![],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                "true != false",
+                vec![
                     make::it!(&Op::True),
                     make::it!(&Op::False),
                     make::it!(&Op::NotEqual),
                     make::it!(&Op::Pop),
-                ],
-            },
-            CompilerTestCase {
-                input: "!true",
-                expected_constants: vec![],
-                expected_instructions: vec![
+                ]
+            ),
+            compiler_test_case!(
+                "!true",
+                vec![
                     make::it!(&Op::True),
                     make::it!(&Op::Bang),
                     make::it!(&Op::Pop),
-                ],
-            },
-        ];
-
-        run_compiler_tests(tests);
+                ]
+            ),
+        ]);
     }
 
     #[test]
     fn test_conditionals() {
-        let tests = vec![
-            CompilerTestCase {
-                input: "if (true) { 10 }; 3333;",
-                expected_constants: vec![
-                    CompilerInterface::Int(10.0),
-                    CompilerInterface::Int(3333.0),
-                ],
-                expected_instructions: vec![
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                "if (true) { 10 }; 3333;",
+                vec![
                     make::it!(&Op::True),
                     make::it!(&Op::JumpNotTruthy, vec![10u16]),
                     make::it!(&Op::Constant, vec![0u16]),
@@ -603,15 +597,11 @@ mod test {
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "if (true) { 10 } else { 20 }; 3333;",
-                expected_constants: vec![
-                    CompilerInterface::Int(10.0),
-                    CompilerInterface::Int(20.0),
-                    CompilerInterface::Int(3333.0),
-                ],
-                expected_instructions: vec![
+                (10.0, 3333.0)
+            ),
+            compiler_test_case!(
+                "if (true) { 10 } else { 20 }; 3333;",
+                vec![
                     make::it!(&Op::True),
                     make::it!(&Op::JumpNotTruthy, vec![10u16]),
                     make::it!(&Op::Constant, vec![0u16]),
@@ -621,49 +611,47 @@ mod test {
                     make::it!(&Op::Constant, vec![2u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-        ];
-
-        run_compiler_tests(tests);
+                (10.0, 20.0, 3333.0)
+            ),
+        ]);
     }
 
     #[test]
     fn test_global_let_statements() {
-        let tests = vec![
-            CompilerTestCase {
-                input: r#"
-                let one = 1;
-                let two = 2;
-                "#,
-                expected_constants: vec![CompilerInterface::Int(1.0), CompilerInterface::Int(2.0)],
-                expected_instructions: vec![
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                    let one = 1;
+                    let two = 2;
+                    "#,
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::SetGlobal, vec![1u16]),
                 ],
-            },
-            CompilerTestCase {
-                input: r#"
-                let one = 1;
-                one;
-                "#,
-                expected_constants: vec![CompilerInterface::Int(1.0)],
-                expected_instructions: vec![
+                (1.0, 2.0)
+            ),
+            compiler_test_case!(
+                r#"
+                    let one = 1;
+                    one;
+                    "#,
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
                     make::it!(&Op::GetGlobal, vec![0u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: r#"
-                let one = 1;
-                let two = one;
-                two;
-                "#,
-                expected_constants: vec![CompilerInterface::Int(1.0)],
-                expected_instructions: vec![
+                (1.0)
+            ),
+            compiler_test_case!(
+                r#"
+                    let one = 1;
+                    let two = one;
+                    two;
+                    "#,
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
                     make::it!(&Op::GetGlobal, vec![0u16]),
@@ -671,73 +659,53 @@ mod test {
                     make::it!(&Op::GetGlobal, vec![1u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-        ];
-
-        run_compiler_tests(tests);
+                (1.0)
+            ),
+        ]);
     }
 
     #[test]
     fn test_string_expressions() {
         run_compiler_tests(vec![
-            CompilerTestCase {
-                input: r#""monkey""#,
-                expected_constants: vec![CompilerInterface::String("monkey")],
-                expected_instructions: vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Pop),
-                ],
-            },
-            CompilerTestCase {
-                input: r#""mon" + "key""#,
-                expected_constants: vec![
-                    CompilerInterface::String("mon"),
-                    CompilerInterface::String("key"),
-                ],
-                expected_instructions: vec![
+            compiler_test_case!(
+                r#""monkey""#,
+                vec![make::it!(&Op::Constant, vec![0u16]), make::it!(&Op::Pop),],
+                ("monkey")
+            ),
+            compiler_test_case!(
+                r#""mon" + "key""#,
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Add),
                     make::it!(&Op::Pop),
                 ],
-            },
+                ("mon", "key")
+            ),
         ]);
     }
 
     #[test]
     fn test_array_literals() {
         run_compiler_tests(vec![
-            CompilerTestCase {
-                input: "[]",
-                expected_constants: vec![],
-                expected_instructions: vec![make::it!(&Op::Array, vec![0u16]), make::it!(&Op::Pop)],
-            },
-            CompilerTestCase {
-                input: "[1, 2, 3]",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(3.0),
-                ],
-                expected_instructions: vec![
+            compiler_test_case!(
+                "[]",
+                vec![make::it!(&Op::Array, vec![0u16]), make::it!(&Op::Pop)]
+            ),
+            compiler_test_case!(
+                "[1, 2, 3]",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Constant, vec![2u16]),
                     make::it!(&Op::Array, vec![3u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "[1 + 2, 3 - 4, 5 * 6]",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(3.0),
-                    CompilerInterface::Int(4.0),
-                    CompilerInterface::Int(5.0),
-                    CompilerInterface::Int(6.0),
-                ],
-                expected_instructions: vec![
+                (1.0, 2.0, 3.0)
+            ),
+            compiler_test_case!(
+                "[1 + 2, 3 - 4, 5 * 6]",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Add),
@@ -750,29 +718,21 @@ mod test {
                     make::it!(&Op::Array, vec![3u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
+                (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+            ),
         ]);
     }
-
+    //
     #[test]
     fn test_hash_literals() {
         run_compiler_tests(vec![
-            CompilerTestCase {
-                input: "{}",
-                expected_constants: vec![],
-                expected_instructions: vec![make::it!(&Op::Hash, vec![0u16]), make::it!(&Op::Pop)],
-            },
-            CompilerTestCase {
-                input: "{1: 2, 3: 4, 5: 6}",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(3.0),
-                    CompilerInterface::Int(4.0),
-                    CompilerInterface::Int(5.0),
-                    CompilerInterface::Int(6.0),
-                ],
-                expected_instructions: vec![
+            compiler_test_case!(
+                "{}",
+                vec![make::it!(&Op::Hash, vec![0u16]), make::it!(&Op::Pop)]
+            ),
+            compiler_test_case!(
+                "{1: 2, 3: 4, 5: 6}",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Constant, vec![2u16]),
@@ -782,18 +742,11 @@ mod test {
                     make::it!(&Op::Hash, vec![6u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "{1: 2 + 3, 4: 5 * 6}",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(3.0),
-                    CompilerInterface::Int(4.0),
-                    CompilerInterface::Int(5.0),
-                    CompilerInterface::Int(6.0),
-                ],
-                expected_instructions: vec![
+                (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+            ),
+            compiler_test_case!(
+                "{1: 2 + 3, 4: 5 * 6}",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Constant, vec![2u16]),
@@ -805,23 +758,17 @@ mod test {
                     make::it!(&Op::Hash, vec![4u16]),
                     make::it!(&Op::Pop),
                 ],
-            },
+                (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+            ),
         ]);
     }
 
     #[test]
     fn test_index_expressions() {
         run_compiler_tests(vec![
-            CompilerTestCase {
-                input: "[1,2,3][1 + 1]",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(3.0),
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(1.0),
-                ],
-                expected_instructions: vec![
+            compiler_test_case!(
+                "[1,2,3][1 + 1]",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Constant, vec![2u16]),
@@ -832,16 +779,11 @@ mod test {
                     make::it!(&Op::Index),
                     make::it!(&Op::Pop),
                 ],
-            },
-            CompilerTestCase {
-                input: "{1: 2}[2 - 1]",
-                expected_constants: vec![
-                    CompilerInterface::Int(1.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(2.0),
-                    CompilerInterface::Int(1.0),
-                ],
-                expected_instructions: vec![
+                (1.0, 2.0, 3.0, 1.0, 1.0)
+            ),
+            compiler_test_case!(
+                "{1: 2}[2 - 1]",
+                vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::Constant, vec![1u16]),
                     make::it!(&Op::Hash, vec![2u16]),
@@ -851,7 +793,8 @@ mod test {
                     make::it!(&Op::Index),
                     make::it!(&Op::Pop),
                 ],
-            },
+                (1.0, 2.0, 2.0, 1.0)
+            ),
         ]);
     }
 }
