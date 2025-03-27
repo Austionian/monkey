@@ -25,7 +25,7 @@ impl<'a> VM<'a> {
     pub fn new(compiler: Compiler<'a, '_>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
         VM {
             constants: compiler.constants,
-            instructions: compiler.instructions,
+            instructions: Vec::new(), //compiler.instructions,
             stack: [const { ObjectType::NullObj }; STACK_SIZE],
             globals,
             sp: 0,
@@ -104,6 +104,7 @@ impl<'a> VM<'a> {
 
                     self.execute_index_expression(left, index)?;
                 }
+                Op::Call | Op::Return | Op::ReturnValue => todo!(),
             }
 
             ip += 1;

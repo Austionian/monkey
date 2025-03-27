@@ -33,6 +33,10 @@ pub enum Op {
     Array,
     Hash,
     Index,
+
+    Call,
+    Return,
+    ReturnValue,
 }
 
 impl Into<u8> for Op {
@@ -50,7 +54,32 @@ impl Into<Op> for u8 {
 
 impl Display for Op {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Op")
+        match self {
+            Self::Pop => write!(f, "OpPop"),
+            Self::Constant => write!(f, "OpConstant"),
+            Self::Add => write!(f, "OpAdd"),
+            Self::Sub => write!(f, "OpSub"),
+            Self::Mul => write!(f, "OpMul"),
+            Self::Div => write!(f, "OpDiv"),
+            Self::True => write!(f, "OpTrue"),
+            Self::False => write!(f, "OpFalse"),
+            Self::Equal => write!(f, "OpEqual"),
+            Self::NotEqual => write!(f, "OpNotEqual"),
+            Self::GreaterThan => write!(f, "OpGreaterThan"),
+            Self::Minus => write!(f, "OpMinus"),
+            Self::Bang => write!(f, "OpBang"),
+            Self::Jump => write!(f, "OpJump"),
+            Self::JumpNotTruthy => write!(f, "OpJumpNotTruthy"),
+            Self::Null => write!(f, "OpNull"),
+            Self::GetGlobal => write!(f, "OpGetGlobal"),
+            Self::SetGlobal => write!(f, "OpSetGlobal"),
+            Self::Array => write!(f, "OpArray"),
+            Self::Hash => write!(f, "OpHash"),
+            Self::Index => write!(f, "OpIndex"),
+            Self::Call => write!(f, "OpCall"),
+            Self::ReturnValue => write!(f, "OpReturnValue"),
+            Self::Return => write!(f, "OpReturn"),
+        }
     }
 }
 
@@ -70,6 +99,9 @@ impl Op {
             | Self::Minus
             | Self::Bang
             | Self::Index
+            | Self::Call
+            | Self::ReturnValue
+            | Self::Return
             | Self::Null => vec![],
 
             Self::Constant
