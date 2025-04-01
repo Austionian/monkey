@@ -215,6 +215,10 @@ impl Compile for Expression {
 
                 compiler.emit(&Op::Constant, vec![constant]);
             }
+            Self::CallExpression(function, _) => {
+                function.compile(compiler)?;
+                compiler.emit(&Op::Call, vec![]);
+            }
             _ => panic!("no done yet {self:?}"),
         }
 
@@ -931,6 +935,41 @@ mod test {
                         make::it!(&Op::Constant, vec![0u16]),
                         make::it!(&Op::Pop),
                         make::it!(&Op::Constant, vec![1u16]),
+                        make::it!(&Op::ReturnValue)
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                "fn() { 24 }()",
+                vec![
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Call),
+                    make::it!(&Op::Pop)
+                ],
+                (
+                    24.0,
+                    vec![
+                        make::it!(&Op::Constant, vec![0u16]),
+                        make::it!(&Op::ReturnValue)
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                r#"
+            let noArg = fn() { 24 };
+            noArg();
+            "#,
+                vec![
+                    make::it!(&Op::Constant, vec![1u16]), // the compiled function
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::Call),
+                    make::it!(&Op::Pop)
+                ],
+                (
+                    24.0,
+                    vec![
+                        make::it!(&Op::Constant, vec![0u16]), // the literal 24
                         make::it!(&Op::ReturnValue)
                     ]
                 )
