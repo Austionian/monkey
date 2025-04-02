@@ -1,47 +1,63 @@
+mod frame;
+
 use crate::{
     code::{self, Op},
     compiler::Compiler,
     object::{HashPair, ObjectType},
 };
 use anyhow::{anyhow, bail};
+use frame::Frame;
 use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
+const FRAME_SIZE: usize = 1024;
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
 const NULL: ObjectType = ObjectType::NullObj;
 
 pub struct VM<'a> {
     constants: &'a mut Vec<ObjectType>,
-    instructions: code::Instructions,
     stack: [ObjectType; STACK_SIZE],
     globals: &'a mut [ObjectType; GLOBAL_SIZE],
     // stack pointer
     sp: usize,
+    frames: [Frame; FRAME_SIZE],
+    frames_index: usize,
 }
 
 impl<'a> VM<'a> {
-    pub fn new(compiler: Compiler<'a, '_>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
+    pub fn new(mut compiler: Compiler<'a, '_>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
+        let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions);
+        let main_frame = Frame::new(main_func);
+
+        let mut frames = [const { Frame::default() }; FRAME_SIZE];
+        frames[0] = main_frame;
+
         VM {
             constants: compiler.constants,
-            instructions: Vec::new(), //compiler.instructions,
             stack: [const { ObjectType::NullObj }; STACK_SIZE],
             globals,
             sp: 0,
+            frames,
+            frames_index: 1,
         }
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
         // ip = 'instruction pointer'
-        let mut ip = 0;
-        while ip < self.instructions.len() {
-            let op: Op = self.instructions[ip].into();
+        let mut ip;
+        while self.current_frame().ip < self.current_frame().instructions().len() as isize - 1 {
+            self.current_frame().ip += 1;
+
+            ip = self.current_frame().ip as usize;
+            let instructions = self.current_frame().instructions();
+            let op: Op = instructions[ip as usize].into();
 
             match op {
                 Op::Constant => {
-                    let const_index = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let const_index = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
 
                     // TODO: remove this clone and cast
                     self.push(self.constants[const_index as usize].clone())?;
@@ -58,31 +74,31 @@ impl<'a> VM<'a> {
                 Op::Bang => self.execute_bang_operator()?,
                 Op::Minus => self.execute_minus_operator()?,
                 Op::Jump => {
-                    let pos = code::read_u16(&self.instructions[ip + 1..]);
-                    ip = pos as usize - 1;
+                    let pos = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip = pos as isize - 1;
                 }
                 Op::JumpNotTruthy => {
-                    let pos = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let pos = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
 
                     if !Self::is_truthy(self.pop()) {
-                        ip = pos as usize - 1;
+                        self.current_frame().ip = pos as isize - 1;
                     }
                 }
                 Op::Null => self.push(NULL)?,
                 Op::SetGlobal => {
-                    let global_index = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let global_index = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
                     self.globals[global_index as usize] = self.pop();
                 }
                 Op::GetGlobal => {
-                    let global_index = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let global_index = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
                     self.push(self.globals[global_index as usize].clone())?;
                 }
                 Op::Array => {
-                    let num_elements = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let num_elements = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
 
                     let array = self.build_array(num_elements);
                     self.sp -= num_elements as usize;
@@ -90,8 +106,8 @@ impl<'a> VM<'a> {
                     self.push(array)?;
                 }
                 Op::Hash => {
-                    let num_elements = code::read_u16(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let num_elements = code::read_u16(&instructions[ip + 1..]);
+                    self.current_frame().ip += 2;
 
                     let hash = self.build_hash(num_elements)?;
                     self.sp -= num_elements as usize;
@@ -106,11 +122,24 @@ impl<'a> VM<'a> {
                 }
                 Op::Call | Op::Return | Op::ReturnValue => todo!(),
             }
-
-            ip += 1;
         }
 
         Ok(())
+    }
+
+    fn current_frame(&mut self) -> &mut Frame {
+        &mut self.frames[self.frames_index - 1]
+    }
+
+    fn push_frame(&mut self, frame: Frame) {
+        self.frames[self.frames_index] = frame;
+        self.frames_index += 1;
+    }
+
+    fn pop_frame(&mut self) -> &Frame {
+        self.frames_index -= 1;
+
+        &self.frames[self.frames_index]
     }
 
     fn execute_index_expression(
@@ -401,7 +430,7 @@ mod test {
                     test_integer_object(*expected_value, &hash.get(expected_key).unwrap().value);
                 }
             }
-            _ => panic!("expected a hash object"),
+            _ => panic!("expected a hash object, got: {:?}", actual),
         }
     }
 
@@ -413,28 +442,28 @@ mod test {
                     test_integer_object(expected[i], obj);
                 }
             }
-            _ => panic!("expected an array object"),
+            _ => panic!("expected an array object, got: {:?}", actual),
         }
     }
 
     fn test_string_object(expected: &str, actual: &ObjectType) {
         match actual {
             ObjectType::StringObj(s) => assert_eq!(expected, *s),
-            _ => panic!("expected a string object"),
+            _ => panic!("expected a string object, got: {:?}", actual),
         }
     }
 
     fn test_bool_object(expected: bool, actual: &object::ObjectType) {
         match actual {
             ObjectType::BoolObj(b) => assert_eq!(expected, *b),
-            _ => panic!("expected only bool objects"),
+            _ => panic!("expected only bool objects, got: {:?}", actual),
         }
     }
 
     fn test_integer_object(expected: f64, actual: &object::ObjectType) {
         match actual {
             ObjectType::IntegerObj(x) => assert_eq!(expected, *x),
-            _ => panic!("expected only integer objects"),
+            _ => panic!("expected only integer objects, got: {:?}", actual),
         }
     }
 
