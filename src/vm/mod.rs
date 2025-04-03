@@ -120,7 +120,30 @@ impl<'a> VM<'a> {
 
                     self.execute_index_expression(left, index)?;
                 }
-                Op::Call | Op::Return | Op::ReturnValue => todo!(),
+                Op::Call => {
+                    // TODO: get rid of this clone and pass frames by reference
+                    let frame = Frame::new(self.stack[self.sp - 1].clone());
+                    self.push_frame(frame);
+                }
+                Op::ReturnValue => {
+                    // Gets the functions return value from the stack
+                    let return_value = self.pop();
+
+                    // Pops the current, to the parent frame
+                    self.pop_frame();
+                    // Pops the current function from the stack
+                    self.pop();
+
+                    // Pushes the returned value from the function onto the stack
+                    self.push(return_value)?;
+                }
+                Op::Return => {
+                    self.pop_frame();
+                    self.pop();
+
+                    self.push(NULL)?;
+                }
+                Op::GetLocal | Op::SetLocal => todo!(),
             }
         }
 
@@ -597,5 +620,89 @@ mod test {
             vm_test_case!("{1: 1}[0]", NULL),
             vm_test_case!("{}[0]", NULL),
         ]);
+    }
+
+    #[test]
+    fn test_function_calls() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let fivePlusTen = fn() { 5 + 10 };
+                    fivePlusTen();
+                "#,
+                15f64
+            ),
+            vm_test_case!(
+                r#"
+                    let one = fn() { 1; };
+                    let two = fn() { 2; };
+                    one() + two()
+                "#,
+                3f64
+            ),
+            vm_test_case!(
+                r#"
+                    let a = fn() { 1 };
+                    let b = fn() { a() + 1 };
+                    let c = fn() { b() + 1 };
+                    c();
+                "#,
+                3f64
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_functions_with_return_statements() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let earlyExit = fn() { return 99; 100; };
+                    earlyExit();
+                "#,
+                99f64
+            ),
+            vm_test_case!(
+                r#"
+                    let earlyExit = fn() { return 99; 100; };
+                    earlyExit();
+                "#,
+                99f64
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_functions_without_return_values() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let noReturn = fn() { };
+                    noReturn();
+                "#,
+                NULL
+            ),
+            vm_test_case!(
+                r#"
+                    let noReturn = fn() { };
+                    let noReturnTwo = fn() { };
+                    noReturn();
+                    noReturnTwo();
+                "#,
+                NULL
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_frist_class_functions() {
+        run_vm_tests(vec![vm_test_case!(
+            r#"
+                let returnsOne = fn() { 1; };
+                let returnsOneReturner = fn() { returnsOne; };
+                returnsOneReturner()();
+            "#,
+            1f64
+        )]);
     }
 }

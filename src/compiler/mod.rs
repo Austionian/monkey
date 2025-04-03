@@ -366,6 +366,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
                 2 => {
                     ins = make::it!(op, operands.iter().map(|x| *x as u16));
                 }
+                1 => ins = make::it!(op, operands.iter().map(|x| *x as u8)),
                 _ => todo!(),
             };
         }

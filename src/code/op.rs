@@ -30,6 +30,9 @@ pub enum Op {
     GetGlobal,
     SetGlobal,
 
+    GetLocal,
+    SetLocal,
+
     Array,
     Hash,
     Index,
@@ -79,6 +82,8 @@ impl Display for Op {
             Self::Call => write!(f, "OpCall"),
             Self::ReturnValue => write!(f, "OpReturnValue"),
             Self::Return => write!(f, "OpReturn"),
+            Self::GetLocal => write!(f, "OpGetLocal"),
+            Self::SetLocal => write!(f, "OpSetLocal"),
         }
     }
 }
@@ -103,6 +108,8 @@ impl Op {
             | Self::ReturnValue
             | Self::Return
             | Self::Null => vec![],
+
+            Self::GetLocal | Self::SetLocal => vec![1],
 
             Self::Constant
             | Self::Jump

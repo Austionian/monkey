@@ -119,18 +119,23 @@ pub fn read_u16(ins: &[u8]) -> u16 {
     u16::from_be_bytes(arr)
 }
 
-pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u16>, usize) {
+pub fn read_u8(ins: &[u8]) -> u8 {
+    ins[0]
+}
+
+pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u32>, usize) {
     let widths = op.lookup_widths();
-    let mut operands = vec![0u16; widths.len()];
+    let mut operands = vec![];
     let mut offset = 0;
 
-    for (i, width) in widths.iter().enumerate() {
+    for width in widths {
         match width {
-            2 => operands[i] = read_u16(&ins[offset..offset + *width as usize]),
+            2 => operands.push(read_u16(&ins[offset..offset + 2]).into()),
+            1 => operands.push(read_u8(&ins[offset..]).into()),
             _ => todo!(),
         };
 
-        offset += *width as usize;
+        offset += width as usize;
     }
 
     (operands, offset.into())
@@ -158,7 +163,7 @@ pub fn instruction_to_string(ins: &Instructions) -> String {
     out
 }
 
-fn format_instruction(op: &Op, operands: Vec<u16>) -> Result<String, String> {
+fn format_instruction(op: &Op, operands: Vec<u32>) -> Result<String, String> {
     let operand_count = op.lookup_widths().len();
 
     if operands.len() != operand_count {
@@ -176,9 +181,9 @@ fn format_instruction(op: &Op, operands: Vec<u16>) -> Result<String, String> {
 mod test {
     use super::*;
 
-    struct Test {
+    struct Test<T> {
         op: Op,
-        operands: Vec<u16>,
+        operands: Vec<T>,
         expected: Vec<Opcode>,
     }
 
@@ -187,7 +192,7 @@ mod test {
         let tests = vec![
             Test {
                 op: Op::Constant,
-                operands: vec![65534],
+                operands: vec![65534u16],
                 expected: vec![Op::Constant.into(), 255, 254],
             },
             Test {
@@ -209,16 +214,37 @@ mod test {
     }
 
     #[test]
+    fn test_make_u8() {
+        let tests = vec![Test {
+            op: Op::GetLocal,
+            operands: vec![255u8],
+            expected: vec![Op::GetLocal.into(), 255],
+        }];
+
+        for test in tests {
+            let instruction = make::it!(&test.op, test.operands);
+
+            assert_eq!(instruction.len(), test.expected.len());
+
+            for (i, _) in test.expected.iter().enumerate() {
+                assert_eq!(instruction[i], test.expected[i]);
+            }
+        }
+    }
+
+    #[test]
     fn test_instructions_string() {
         let instructions: Vec<Instructions> = vec![
             make::it!(&Op::Add),
+            make::it!(&Op::GetLocal, vec![1u8]),
             make::it!(&Op::Constant, vec![2u16]),
             make::it!(&Op::Constant, vec![65535u16]),
         ];
 
         let expected = r#"0000 OpAdd
-0001 OpConstant 2
-0004 OpConstant 65535
+0001 OpGetLocal 1
+0003 OpConstant 2
+0006 OpConstant 65535
 "#;
 
         let concated = instructions
@@ -232,15 +258,15 @@ mod test {
 
     #[test]
     fn test_read_operands() {
-        struct Test {
+        struct Test<T> {
             op: Op,
-            operands: Vec<u16>,
+            operands: Vec<T>,
             bytes_read: usize,
         }
 
         let tests = vec![Test {
             op: Op::Constant,
-            operands: vec![65535],
+            operands: vec![65535u16],
             bytes_read: 2,
         }];
 
@@ -251,7 +277,24 @@ mod test {
             assert_eq!(n, t.bytes_read);
 
             for (i, want) in t.operands.iter().enumerate() {
-                assert_eq!(operands_read[i], *want);
+                assert_eq!(operands_read[i], *want as u32);
+            }
+        }
+
+        let tests = vec![Test {
+            op: Op::GetLocal,
+            operands: vec![255u8],
+            bytes_read: 1,
+        }];
+
+        for t in tests.iter() {
+            let instruction = make::it!(&t.op, t.operands.clone());
+
+            let (operands_read, n) = read_operands(&t.op, &instruction[1..]);
+            assert_eq!(n, t.bytes_read);
+
+            for (i, want) in t.operands.iter().enumerate() {
+                assert_eq!(operands_read[i], *want as u32);
             }
         }
     }
