@@ -1023,4 +1023,71 @@ mod test {
             .clone();
         assert_eq!(previous.opcode, Op::Mul);
     }
+
+    #[test]
+    fn test_let_statement_scopes() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                    let num = 55;
+                    fn() { num }
+                "#,
+                vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Pop),
+                ],
+                (
+                    55.0,
+                    vec![
+                        make::it!(&Op::GetGlobal, vec![0u16]),
+                        make::it!(&Op::ReturnValue)
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                r#"
+                    fn() {
+                        let num = 55;
+                        num
+                    }
+                "#,
+                vec![make::it!(&Op::Constant, vec![1u16]), make::it!(&Op::Pop),],
+                (
+                    55.0,
+                    vec![
+                        make::it!(&Op::Constant, vec![0u16]),
+                        make::it!(&Op::SetLocal, vec![0u16]),
+                        make::it!(&Op::GetLocal, vec![0u16]),
+                        make::it!(&Op::ReturnValue)
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                r#"
+                    fn() {
+                        let a = 55;
+                        let b = 77;
+                        a + b
+                    }
+                "#,
+                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop),],
+                (
+                    55.0,
+                    77.0,
+                    vec![
+                        make::it!(&Op::Constant, vec![0u16]),
+                        make::it!(&Op::SetLocal, vec![0u16]),
+                        make::it!(&Op::Constant, vec![1u16]),
+                        make::it!(&Op::SetLocal, vec![1u16]),
+                        make::it!(&Op::GetLocal, vec![0u16]),
+                        make::it!(&Op::GetLocal, vec![1u16]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::ReturnValue)
+                    ]
+                )
+            ),
+        ]);
+    }
 }
