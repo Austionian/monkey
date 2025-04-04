@@ -27,7 +27,7 @@ pub struct VM<'a> {
 }
 
 impl<'a> VM<'a> {
-    pub fn new(mut compiler: Compiler<'a, '_>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
+    pub fn new(mut compiler: Compiler<'a>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
         let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions);
         let main_frame = Frame::new(main_func);
 
@@ -403,8 +403,8 @@ mod test {
         for test in tests {
             let program = test_setup!(&test.input);
             let mut constants = Vec::new();
-            let mut symbol_table = SymbolTable::new();
-            let mut comp = Compiler::new(&mut constants, &mut symbol_table);
+            let symbol_table = SymbolTable::new();
+            let mut comp = Compiler::new(&mut constants, symbol_table);
             let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
 
             comp.compile(program).unwrap();
@@ -442,7 +442,7 @@ mod test {
             return;
         }
 
-        panic!("expected f64");
+        todo!("type not yet ready for testing");
     }
 
     fn test_hash_object(expected: HashMap<u64, f64>, actual: &ObjectType) {

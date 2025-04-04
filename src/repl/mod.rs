@@ -12,16 +12,11 @@ use std::{
 
 const PROMPT: &'static str = ">> ";
 
-pub fn start<'a, 'b>(
+pub fn start<'a>(
     constants: &'a mut Vec<ObjectType>,
-    // 'b outlives 'a but this probably isn't sustainable because 'b is pretty
-    // much static here. New scope will be thrown away on subsequent iterations
-    // of the loop, but they'll still probably be expected to have 'b lifetime
-    symbol_table: &'a mut SymbolTable<'b>,
+    symbol_table: SymbolTable,
     globals: &mut [ObjectType; GLOBAL_SIZE],
-) where
-    'b: 'a,
-{
+) -> SymbolTable {
     print!("{PROMPT}");
     let _ = io::stdout().flush();
 
@@ -44,7 +39,7 @@ pub fn start<'a, 'b>(
         for error in parser.errors {
             eprintln!("\t{error}");
         }
-        return;
+        return symbol_table;
     }
 
     // evaluated program
@@ -64,14 +59,19 @@ pub fn start<'a, 'b>(
             eprintln!("woops! compilation failed");
         }
 
-        let mut machine: VM = VM::new(comp, globals);
+        let symbols = comp.symbol_table.clone();
+        let mut machine = VM::new(comp, globals);
         if let Err(e) = machine.run() {
             eprintln!("whoops! executing the bytecode failed:, {e}");
         }
 
         let stack_top = machine.last_popped_stack_elem();
         println!("{}", stack_top.inspect());
+
+        return symbols;
     }
+
+    symbol_table
 }
 
 const MONKEY_FACE: &str = r#"            __,__

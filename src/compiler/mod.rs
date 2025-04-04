@@ -5,22 +5,22 @@ use crate::{
     object::{self, ObjectType},
     token::Token,
 };
-use symbol_table::SymbolTable;
+use symbol_table::{SymbolTable, GLOBAL_SCOPE};
 use thiserror::Error;
 
-pub struct Compiler<'a, 'b> {
+pub struct Compiler<'a> {
     pub constants: &'a mut Vec<object::ObjectType>,
-    pub symbol_table: &'a mut SymbolTable<'b>,
+    pub symbol_table: SymbolTable,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
 }
 
-pub struct Environment<'a> {
+pub struct Environment {
     pub constants: Vec<object::ObjectType>,
-    pub symbol_table: SymbolTable<'a>,
+    pub symbol_table: SymbolTable,
 }
 
-impl<'a> Environment<'a> {
+impl Environment {
     pub fn new() -> Self {
         Self {
             constants: Vec::new(),
@@ -153,7 +153,11 @@ impl Compile for Expression {
                     .symbol_table
                     .resolve(name)
                     .ok_or(CompilerError::UndefinedVariable)?;
-                compiler.emit(&Op::GetGlobal, vec![symbol.index]);
+                if symbol.scope == GLOBAL_SCOPE {
+                    compiler.emit(&Op::GetGlobal, vec![symbol.index]);
+                } else {
+                    compiler.emit(&Op::GetLocal, vec![symbol.index]);
+                }
             }
             Self::StringExpression(string) => {
                 let i = compiler.add_constant(string.to_owned().into());
@@ -260,8 +264,15 @@ impl Compile for LetStatement {
         } else {
             return Err(CompilerError::InvalidToken(self.name.clone()));
         };
+
         let symbol = compiler.symbol_table.define(name.to_string());
-        compiler.emit(&Op::SetGlobal, vec![symbol.index]);
+
+        if symbol.scope == GLOBAL_SCOPE {
+            compiler.emit(&Op::SetGlobal, vec![symbol.index]);
+        } else {
+            compiler.emit(&Op::SetLocal, vec![symbol.index]);
+        }
+
         Ok(())
     }
 }
@@ -276,11 +287,8 @@ impl Compile for BlockStatement {
     }
 }
 
-impl<'a, 'b> Compiler<'a, 'b> {
-    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: &'a mut SymbolTable<'b>) -> Self
-    where
-        'b: 'a,
-    {
+impl<'a> Compiler<'a> {
+    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: SymbolTable) -> Self {
         Self {
             constants,
             symbol_table,
@@ -310,6 +318,8 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
         self.scopes.push(scope);
         self.scope_index += 1;
+
+        self.symbol_table = SymbolTable::new_enclosed(Box::new(self.symbol_table.clone()));
     }
 
     fn leave_scope(&mut self) -> Vec<u8> {
@@ -317,6 +327,12 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
         self.scopes = self.scopes[..self.scopes.len() - 1].to_vec();
         self.scope_index -= 1;
+
+        self.symbol_table = if let Some(outer) = self.symbol_table.outer.as_ref() {
+            *outer.clone()
+        } else {
+            unreachable!("there should always be an outer when leaving a scope")
+        };
 
         instructions
     }
@@ -437,7 +453,7 @@ mod test {
     use code::Instructions;
     use core::panic;
     use object::ObjectType;
-    use std::any::Any;
+    use std::{any::Any, fmt::write};
 
     struct CompilerTestCase {
         input: &'static str,
@@ -511,20 +527,28 @@ mod test {
 
         for (i, constant) in expected.into_iter().enumerate() {
             if constant.is::<f64>() {
-                return test_integer_object(*constant.downcast::<f64>().unwrap(), &actual[i]);
+                test_integer_object(*constant.downcast::<f64>().unwrap(), &actual[i]);
+                continue;
             }
             if constant.is::<bool>() {
-                return test_bool_object(*constant.downcast::<bool>().unwrap(), &actual[i]);
+                test_bool_object(*constant.downcast::<bool>().unwrap(), &actual[i]);
+                continue;
             }
             if constant.is::<&str>() {
-                return test_string_object(*constant.downcast::<&str>().unwrap(), &actual[i]);
+                test_string_object(*constant.downcast::<&str>().unwrap(), &actual[i]);
+                continue;
             }
             if constant.is::<Vec<Instructions>>() {
                 let expected = *constant.downcast::<Vec<Instructions>>().unwrap();
+                println!("exp --- {expected:?}");
                 if let ObjectType::CompileFunction(ins) = &actual[i] {
                     test_instructions(expected, ins);
+                    continue;
+                } else {
+                    panic!("expected instructions!");
                 }
             }
+            todo!("not yet set up for testing");
         }
     }
 
@@ -533,9 +557,9 @@ mod test {
             let program = test_setup!(&test.input);
 
             let mut constants = Vec::new();
-            let mut symbol_table = SymbolTable::new();
+            let symbol_table = SymbolTable::new();
 
-            let mut compiler = Compiler::new(&mut constants, &mut symbol_table);
+            let mut compiler = Compiler::new(&mut constants, symbol_table);
             compiler.compile(program).unwrap();
 
             test_instructions(test.expected_instructions, &compiler.current_instructions());
@@ -720,7 +744,7 @@ mod test {
                 r#"
                     let one = 1;
                     let two = 2;
-                    "#,
+                "#,
                 vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
@@ -733,7 +757,7 @@ mod test {
                 r#"
                     let one = 1;
                     one;
-                    "#,
+                "#,
                 vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
@@ -747,7 +771,7 @@ mod test {
                     let one = 1;
                     let two = one;
                     two;
-                    "#,
+                "#,
                 vec![
                     make::it!(&Op::Constant, vec![0u16]),
                     make::it!(&Op::SetGlobal, vec![0u16]),
@@ -957,9 +981,9 @@ mod test {
             ),
             compiler_test_case!(
                 r#"
-            let noArg = fn() { 24 };
-            noArg();
-            "#,
+                    let noArg = fn() { 24 };
+                    noArg();
+                "#,
                 vec![
                     make::it!(&Op::Constant, vec![1u16]), // the compiled function
                     make::it!(&Op::SetGlobal, vec![0u16]),
@@ -990,9 +1014,9 @@ mod test {
     #[test]
     fn test_compiler_scopes() {
         let mut constants = Vec::new();
-        let mut symbol_table = SymbolTable::new();
+        let symbol_table = SymbolTable::new();
 
-        let mut compiler = Compiler::new(&mut constants, &mut symbol_table);
+        let mut compiler = Compiler::new(&mut constants, symbol_table);
 
         assert_eq!(compiler.scope_index, 0);
         compiler.emit(&Op::Mul, vec![]);
@@ -1008,7 +1032,11 @@ mod test {
             .clone();
         assert_eq!(last.opcode, Op::Sub);
 
+        assert!(compiler.symbol_table.outer.as_ref().is_some());
+
         compiler.leave_scope();
+
+        assert!(compiler.symbol_table.outer.as_ref().is_none());
         assert_eq!(compiler.scope_index, 0);
 
         compiler.emit(&Op::Add, vec![]);
@@ -1058,8 +1086,8 @@ mod test {
                     55.0,
                     vec![
                         make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::SetLocal, vec![0u16]),
-                        make::it!(&Op::GetLocal, vec![0u16]),
+                        make::it!(&Op::SetLocal, vec![0u8]),
+                        make::it!(&Op::GetLocal, vec![0u8]),
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -1072,17 +1100,17 @@ mod test {
                         a + b
                     }
                 "#,
-                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop),],
+                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop)],
                 (
                     55.0,
                     77.0,
                     vec![
                         make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::SetLocal, vec![0u16]),
+                        make::it!(&Op::SetLocal, vec![0u8]),
                         make::it!(&Op::Constant, vec![1u16]),
-                        make::it!(&Op::SetLocal, vec![1u16]),
-                        make::it!(&Op::GetLocal, vec![0u16]),
-                        make::it!(&Op::GetLocal, vec![1u16]),
+                        make::it!(&Op::SetLocal, vec![1u8]),
+                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::GetLocal, vec![1u8]),
                         make::it!(&Op::Add),
                         make::it!(&Op::ReturnValue)
                     ]

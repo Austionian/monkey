@@ -10,6 +10,6 @@ fn main() {
     let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
 
     loop {
-        repl::start(&mut constants, &mut symbol_table, &mut globals);
+        symbol_table = repl::start(&mut constants, symbol_table, &mut globals);
     }
 }
