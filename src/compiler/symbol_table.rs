@@ -22,7 +22,7 @@ impl PartialEq for Symbol {
 pub struct SymbolTable {
     pub outer: Option<Box<Self>>,
     store: HashMap<String, Symbol>,
-    num_definitions: usize,
+    pub num_definitions: usize,
 }
 
 impl SymbolTable {

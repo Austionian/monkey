@@ -214,7 +214,9 @@ impl Compile for Expression {
                     compiler.emit(&Op::Return, vec![]);
                 }
 
-                let compiled_fn = ObjectType::CompileFunction(compiler.leave_scope());
+                let num_locals = compiler.symbol_table.num_definitions;
+                let compiled_fn = ObjectType::CompileFunction(compiler.leave_scope(), num_locals);
+
                 let constant = compiler.add_constant(compiled_fn);
 
                 compiler.emit(&Op::Constant, vec![constant]);
@@ -541,7 +543,7 @@ mod test {
             if constant.is::<Vec<Instructions>>() {
                 let expected = *constant.downcast::<Vec<Instructions>>().unwrap();
                 println!("exp --- {expected:?}");
-                if let ObjectType::CompileFunction(ins) = &actual[i] {
+                if let ObjectType::CompileFunction(ins, _) = &actual[i] {
                     test_instructions(expected, ins);
                     continue;
                 } else {

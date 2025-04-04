@@ -28,8 +28,8 @@ pub struct VM<'a> {
 
 impl<'a> VM<'a> {
     pub fn new(mut compiler: Compiler<'a>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
-        let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions);
-        let main_frame = Frame::new(main_func);
+        let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions, 0);
+        let main_frame = Frame::new(main_func, 0);
 
         let mut frames = [const { Frame::default() }; FRAME_SIZE];
         frames[0] = main_frame;
@@ -52,7 +52,7 @@ impl<'a> VM<'a> {
 
             ip = self.current_frame().ip as usize;
             let instructions = self.current_frame().instructions();
-            let op: Op = instructions[ip as usize].into();
+            let op: Op = instructions[ip].into();
 
             match op {
                 Op::Constant => {
@@ -122,28 +122,57 @@ impl<'a> VM<'a> {
                 }
                 Op::Call => {
                     // TODO: get rid of this clone and pass frames by reference
-                    let frame = Frame::new(self.stack[self.sp - 1].clone());
+                    let func = self.stack[self.sp - 1].clone();
+                    let num_locals = if let ObjectType::CompileFunction(_, num_locals) = func {
+                        num_locals
+                    } else {
+                        bail!("expected a compiled object function, found: {:?}", func);
+                    };
+
+                    let frame = Frame::new(func, self.sp);
+
+                    let Frame {
+                        base_pointer: bp, ..
+                    } = frame;
+
                     self.push_frame(frame);
+                    self.sp = bp + num_locals;
                 }
                 Op::ReturnValue => {
                     // Gets the functions return value from the stack
                     let return_value = self.pop();
 
-                    // Pops the current, to the parent frame
-                    self.pop_frame();
-                    // Pops the current function from the stack
-                    self.pop();
+                    // Pops the current frame, to the parent frame
+                    let frame = self.pop_frame();
+                    // Subtracting one also 'pops' the current function from the stack
+                    self.sp = frame.base_pointer - 1;
 
                     // Pushes the returned value from the function onto the stack
                     self.push(return_value)?;
                 }
                 Op::Return => {
-                    self.pop_frame();
-                    self.pop();
+                    let frame = self.pop_frame();
+                    // Subtracting one also 'pops' the current function from the stack
+                    self.sp = frame.base_pointer - 1;
 
                     self.push(NULL)?;
                 }
-                Op::GetLocal | Op::SetLocal => todo!(),
+                Op::SetLocal => {
+                    let local_index = code::read_u8(&instructions[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let bp = self.current_frame().base_pointer;
+                    let popped = self.pop();
+                    self.stack[bp + local_index as usize] = popped;
+                }
+                Op::GetLocal => {
+                    let local_index = code::read_u8(&instructions[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let bp = self.current_frame().base_pointer;
+
+                    self.push(self.stack[bp + local_index as usize].clone())?;
+                }
             }
         }
 
@@ -696,13 +725,78 @@ mod test {
 
     #[test]
     fn test_frist_class_functions() {
-        run_vm_tests(vec![vm_test_case!(
-            r#"
-                let returnsOne = fn() { 1; };
-                let returnsOneReturner = fn() { returnsOne; };
-                returnsOneReturner()();
-            "#,
-            1f64
-        )]);
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let returnsOne = fn() { 1; };
+                    let returnsOneReturner = fn() { returnsOne; };
+                    returnsOneReturner()();
+                "#,
+                1f64
+            ),
+            vm_test_case!(
+                r#"
+                    let returnsOneReturner = fn() {
+                        let returnsOne = fn() {
+                            1;
+                        };
+                        returnsOne;
+                    };
+                    returnsOneReturner()();
+                "#,
+                1f64
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_calling_funcs_with_bindings() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let one = fn() { let one = 1; one };
+                    one();
+                "#,
+                1f64
+            ),
+            vm_test_case!(
+                r#"
+                    let oneAndTwo = fn() { let one = 1; let two = 2; one + two };
+                    oneAndTwo();
+                "#,
+                3f64
+            ),
+            vm_test_case!(
+                r#"
+                    let oneAndTwo = fn() { let one = 1; let two = 2; one + two };
+                    let threeAndFour = fn() { let three = 3; let four = 4; three + four };
+                    oneAndTwo() + threeAndFour();
+                "#,
+                10f64
+            ),
+            vm_test_case!(
+                r#"
+                    let firstFoobar = fn() { let foobar = 50; foobar; };
+                    let secondFoobar = fn() { let foobar = 100; foobar; };
+                    firstFoobar() + secondFoobar();
+                "#,
+                150f64
+            ),
+            vm_test_case!(
+                r#"
+                    let globalSeed = 50;
+                    let minusOne = fn() { 
+                        let num = 1;
+                        globalSeed - num;
+                    };
+                    let minusTwo = fn() { 
+                        let num = 2;
+                        globalSeed - num;
+                    };
+                    minusOne() + minusTwo();
+                "#,
+                97f64
+            ),
+        ]);
     }
 }

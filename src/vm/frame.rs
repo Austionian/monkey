@@ -5,15 +5,20 @@ pub(super) struct Frame {
     // always ObjectType::CompileFunction
     pub(super) func: ObjectType,
     pub(super) ip: isize,
+    pub(super) base_pointer: usize,
 }
 
 impl Frame {
-    pub fn new(func: ObjectType) -> Self {
-        Self { func, ip: -1 }
+    pub fn new(func: ObjectType, base_pointer: usize) -> Self {
+        Self {
+            func,
+            ip: -1,
+            base_pointer,
+        }
     }
 
     pub fn instructions(&self) -> &Vec<u8> {
-        if let ObjectType::CompileFunction(instructions) = &self.func {
+        if let ObjectType::CompileFunction(instructions, _) = &self.func {
             instructions
         } else {
             panic!(
@@ -27,6 +32,7 @@ impl Frame {
         Self {
             func: ObjectType::NullObj,
             ip: -1,
+            base_pointer: 0,
         }
     }
 }
