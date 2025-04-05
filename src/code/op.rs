@@ -104,12 +104,11 @@ impl Op {
             | Self::Minus
             | Self::Bang
             | Self::Index
-            | Self::Call
             | Self::ReturnValue
             | Self::Return
             | Self::Null => vec![],
 
-            Self::GetLocal | Self::SetLocal => vec![1],
+            Self::GetLocal | Self::SetLocal | Self::Call => vec![1],
 
             Self::Constant
             | Self::Jump

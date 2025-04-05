@@ -1,6 +1,8 @@
 pub mod symbol_table;
 use crate::{
-    ast::{self, BlockStatement, Expression, LetStatement, ReturnStatement, Statement},
+    ast::{
+        self, BlockStatement, Expression, LetStatement, ReturnStatement, Statement, TokenLiteral,
+    },
     code::{self, make, Op},
     object::{self, ObjectType},
     token::Token,
@@ -202,8 +204,12 @@ impl Compile for Expression {
                 index.compile(compiler)?;
                 compiler.emit(&Op::Index, vec![]);
             }
-            Self::FunctionLiteral(_, _, block) => {
+            Self::FunctionLiteral(_, params, block) => {
                 compiler.enter_scope();
+
+                for param in params {
+                    compiler.symbol_table.define(param.token_literal());
+                }
 
                 block.compile(compiler)?;
 
@@ -215,15 +221,19 @@ impl Compile for Expression {
                 }
 
                 let num_locals = compiler.symbol_table.num_definitions;
-                let compiled_fn = ObjectType::CompileFunction(compiler.leave_scope(), num_locals);
+                let compiled_fn =
+                    ObjectType::CompileFunction(compiler.leave_scope(), num_locals, params.len());
 
                 let constant = compiler.add_constant(compiled_fn);
 
                 compiler.emit(&Op::Constant, vec![constant]);
             }
-            Self::CallExpression(function, _) => {
+            Self::CallExpression(function, args) => {
                 function.compile(compiler)?;
-                compiler.emit(&Op::Call, vec![]);
+                for arg in args {
+                    arg.compile(compiler)?;
+                }
+                compiler.emit(&Op::Call, vec![args.len()]);
             }
             _ => panic!("no done yet {self:?}"),
         }
@@ -543,7 +553,7 @@ mod test {
             if constant.is::<Vec<Instructions>>() {
                 let expected = *constant.downcast::<Vec<Instructions>>().unwrap();
                 println!("exp --- {expected:?}");
-                if let ObjectType::CompileFunction(ins, _) = &actual[i] {
+                if let ObjectType::CompileFunction(ins, _, _) = &actual[i] {
                     test_instructions(expected, ins);
                     continue;
                 } else {
@@ -970,7 +980,7 @@ mod test {
                 "fn() { 24 }()",
                 vec![
                     make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Call),
+                    make::it!(&Op::Call, vec![0u8]),
                     make::it!(&Op::Pop)
                 ],
                 (
@@ -990,7 +1000,7 @@ mod test {
                     make::it!(&Op::Constant, vec![1u16]), // the compiled function
                     make::it!(&Op::SetGlobal, vec![0u16]),
                     make::it!(&Op::GetGlobal, vec![0u16]),
-                    make::it!(&Op::Call),
+                    make::it!(&Op::Call, vec![0u8]),
                     make::it!(&Op::Pop)
                 ],
                 (
@@ -1116,6 +1126,66 @@ mod test {
                         make::it!(&Op::Add),
                         make::it!(&Op::ReturnValue)
                     ]
+                )
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_function_calls() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                    let oneArg = fn(a) {
+                        a
+                    };
+                    oneArg(24);
+                "#,
+                vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::Pop),
+                ],
+                (
+                    vec![
+                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::ReturnValue)
+                    ],
+                    24.0
+                )
+            ),
+            compiler_test_case!(
+                r#"
+                    let manyArg = fn(a, b, c) { 
+                        a; b; c;
+                    };
+                    manyArg(24, 25, 26);
+                "#,
+                vec![
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::SetGlobal, vec![0u16]),
+                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Call, vec![3u8]),
+                    make::it!(&Op::Pop),
+                ],
+                (
+                    vec![
+                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::Pop),
+                        make::it!(&Op::GetLocal, vec![1u8]),
+                        make::it!(&Op::Pop),
+                        make::it!(&Op::GetLocal, vec![2u8]),
+                        make::it!(&Op::ReturnValue)
+                    ],
+                    24.0,
+                    25.0,
+                    26.0
                 )
             ),
         ]);

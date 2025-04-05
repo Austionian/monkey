@@ -27,8 +27,8 @@ pub enum ObjectType {
     BuiltinFunction(BuiltIns),
     ArrayObj(Vec<ObjectType>),
     HashObj(MapObj),
-    // functions bytecode instructions, the number of local variables
-    CompileFunction(Vec<u8>, usize),
+    // functions bytecode instructions, the number of local variables, the number of params
+    CompileFunction(Vec<u8>, usize, usize),
 }
 
 impl ObjectType {
@@ -89,7 +89,7 @@ impl Object for ObjectType {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Self::CompileFunction(f, _) => {
+            Self::CompileFunction(f, _, _) => {
                 format!("{f:?}")
             }
         }
@@ -109,7 +109,7 @@ impl Display for ObjectType {
             Self::BuiltinFunction(_) => write!(f, "BUILTIN"),
             Self::ArrayObj(_) => write!(f, "ARRAY"),
             Self::HashObj(_) => write!(f, "HASH"),
-            Self::CompileFunction(_, _) => write!(f, "COMPILED FUNCTION"),
+            Self::CompileFunction(_, _, _) => write!(f, "COMPILED FUNCTION"),
         }
     }
 }

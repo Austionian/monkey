@@ -18,7 +18,7 @@ impl Frame {
     }
 
     pub fn instructions(&self) -> &Vec<u8> {
-        if let ObjectType::CompileFunction(instructions, _) = &self.func {
+        if let ObjectType::CompileFunction(instructions, _, _) = &self.func {
             instructions
         } else {
             panic!(

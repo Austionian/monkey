@@ -28,7 +28,7 @@ pub struct VM<'a> {
 
 impl<'a> VM<'a> {
     pub fn new(mut compiler: Compiler<'a>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
-        let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions, 0);
+        let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions, 0, 0);
         let main_frame = Frame::new(main_func, 0);
 
         let mut frames = [const { Frame::default() }; FRAME_SIZE];
@@ -121,22 +121,10 @@ impl<'a> VM<'a> {
                     self.execute_index_expression(left, index)?;
                 }
                 Op::Call => {
-                    // TODO: get rid of this clone and pass frames by reference
-                    let func = self.stack[self.sp - 1].clone();
-                    let num_locals = if let ObjectType::CompileFunction(_, num_locals) = func {
-                        num_locals
-                    } else {
-                        bail!("expected a compiled object function, found: {:?}", func);
-                    };
+                    let num_args = code::read_u8(&instructions[ip + 1..]);
+                    self.current_frame().ip += 1;
 
-                    let frame = Frame::new(func, self.sp);
-
-                    let Frame {
-                        base_pointer: bp, ..
-                    } = frame;
-
-                    self.push_frame(frame);
-                    self.sp = bp + num_locals;
+                    self.call_function(num_args.into())?;
                 }
                 Op::ReturnValue => {
                     // Gets the functions return value from the stack
@@ -175,6 +163,32 @@ impl<'a> VM<'a> {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    fn call_function(&mut self, num_args: usize) -> anyhow::Result<()> {
+        // TODO: get rid of this clone and pass frames by reference
+        let func = self.stack[self.sp - 1 - num_args].clone();
+        let (num_locals, num_params) =
+            if let ObjectType::CompileFunction(_, num_locals, num_params) = func {
+                (num_locals, num_params)
+            } else {
+                bail!("callig non-function, found: {:?}", func);
+            };
+
+        if num_params != num_args {
+            bail!("wrong number of arguements: want={num_params}; got={num_args}");
+        }
+
+        let frame = Frame::new(func, self.sp - num_args);
+
+        let Frame {
+            base_pointer: bp, ..
+        } = frame;
+
+        self.push_frame(frame);
+        self.sp = bp + num_locals;
 
         Ok(())
     }
@@ -798,5 +812,122 @@ mod test {
                 97f64
             ),
         ]);
+    }
+
+    #[test]
+    fn test_calling_funcs_with_args_and_bindings() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let identity = fn(a) { a; };
+                    identity(4);
+                "#,
+                4f64
+            ),
+            vm_test_case!(
+                r#"
+                    let sum = fn(a, b) { a + b; };
+                    sum(1, 2);
+                "#,
+                3f64
+            ),
+            vm_test_case!(
+                r#"
+                    let sum = fn(a, b) {
+                        let c = a + b;
+                        c;
+                    };
+
+                    sum(1, 2);
+                "#,
+                3f64
+            ),
+            vm_test_case!(
+                r#"
+                    let sum = fn(a, b) {
+                        let c = a + b;
+                        c;
+                    };
+
+                    sum(1, 2) + sum(3, 4);
+                "#,
+                10f64
+            ),
+            vm_test_case!(
+                r#"
+                    let sum = fn(a, b) {
+                        let c = a + b;
+                        c;
+                    };
+
+                    let outer = fn() {
+                        sum(1, 2) + sum(3, 4);
+                    };
+
+                    outer();
+                "#,
+                10f64
+            ),
+            vm_test_case!(
+                r#"
+                    let globalNum = 10;
+
+                    let sum = fn(a, b) {
+                        let c = a + b;
+                        c + globalNum;
+                    };
+
+                    let outer = fn() {
+                        sum(1, 2) + sum(3, 4) + globalNum;
+                    };
+
+                    outer() + globalNum;
+                "#,
+                50f64
+            ),
+        ]);
+    }
+
+    #[test]
+    fn call_functions_with_wrong_arguments() {
+        let tests = vec![
+            vm_test_case!(
+                r#"
+                    fn() { 1; }(1);
+                "#,
+                "wrong number of arguements: want=0; got=1"
+            ),
+            vm_test_case!(
+                r#"
+                    fn(a) { a; }();
+                "#,
+                "wrong number of arguements: want=1; got=0"
+            ),
+            vm_test_case!(
+                r#"
+                    fn(a, b) { a + b; }(1);
+                "#,
+                "wrong number of arguements: want=2; got=1"
+            ),
+        ];
+
+        for test in tests {
+            let program = test_setup!(&test.input);
+            let mut constants = Vec::new();
+            let symbol_table = SymbolTable::new();
+            let mut comp = Compiler::new(&mut constants, symbol_table);
+            let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
+
+            comp.compile(program).unwrap();
+
+            let mut vm = VM::new(comp, &mut globals);
+
+            let expected_error_msg = test.expected.downcast::<&'static str>().unwrap();
+
+            match vm.run() {
+                Ok(_) => panic!("Expected vm to fail"),
+                Err(msg) => assert_eq!(msg.to_string(), *expected_error_msg),
+            }
+        }
     }
 }
