@@ -1,3 +1,4 @@
+mod builtins;
 use crate::{
     ast::{BlockStatement, TokenLiteral},
     token::Token,
