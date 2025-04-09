@@ -161,6 +161,7 @@ impl<'a> VM<'a> {
 
                     self.push(self.stack[bp + local_index as usize].clone())?;
                 }
+                Op::GetBuiltin => todo!(),
             }
         }
 

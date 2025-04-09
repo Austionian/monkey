@@ -7,7 +7,7 @@ use crate::{
     object::{self, ObjectType},
     token::Token,
 };
-use symbol_table::{SymbolTable, GLOBAL_SCOPE};
+use symbol_table::{Symbol, SymbolTable, BUILTIN_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
 use thiserror::Error;
 
 pub struct Compiler<'a> {
@@ -155,11 +155,13 @@ impl Compile for Expression {
                     .symbol_table
                     .resolve(name)
                     .ok_or(CompilerError::UndefinedVariable)?;
-                if symbol.scope == GLOBAL_SCOPE {
-                    compiler.emit(&Op::GetGlobal, vec![symbol.index]);
-                } else {
-                    compiler.emit(&Op::GetLocal, vec![symbol.index]);
-                }
+
+                match symbol.scope {
+                    GLOBAL_SCOPE => compiler.emit(&Op::GetGlobal, vec![symbol.index]),
+                    LOCAL_SCOPE => compiler.emit(&Op::GetLocal, vec![symbol.index]),
+                    BUILTIN_SCOPE => compiler.emit(&Op::GetBuiltin, vec![symbol.index]),
+                    _ => unreachable!("there should only be three scopes!"),
+                };
             }
             Self::StringExpression(string) => {
                 let i = compiler.add_constant(string.to_owned().into());
@@ -300,7 +302,10 @@ impl Compile for BlockStatement {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(constants: &'a mut Vec<ObjectType>, symbol_table: SymbolTable) -> Self {
+    pub fn new(constants: &'a mut Vec<ObjectType>, mut symbol_table: SymbolTable) -> Self {
+        for (i, v) in object::BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i, &v.name);
+        }
         Self {
             constants,
             symbol_table,
@@ -456,6 +461,8 @@ impl<'a> Compiler<'a> {
             instructions: self.current_instructions().to_vec(),
         }
     }
+
+    fn load_symbol(&mut self, s: Symbol) {}
 }
 
 #[cfg(test)]
@@ -482,11 +489,11 @@ mod test {
             }
         }};
 
-        ($input:expr, $instructions:expr, ($($constant:expr), +)) => {{
+        ($input:expr, $instructions:expr, ($($constant:expr), *)) => {{
             let mut expected_constants = Vec::<Box<dyn Any>>::new();
             $(
                 expected_constants.push(Box::new($constant));
-            )+
+            )*
             CompilerTestCase {
                 input: $input,
                 expected_constants,
@@ -1187,6 +1194,40 @@ mod test {
                     25.0,
                     26.0
                 )
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_builtins() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                    len([]);
+                    push([], 1);
+                "#,
+                vec![
+                    make::it!(&Op::GetBuiltin, vec![0u8]),
+                    make::it!(&Op::Array, vec![0u16]),
+                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::Pop),
+                    make::it!(&Op::GetBuiltin, vec![5u8]),
+                    make::it!(&Op::Array, vec![0u16]),
+                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Call, vec![2u8]),
+                    make::it!(&Op::Pop)
+                ],
+                (1.0)
+            ),
+            compiler_test_case!(
+                "fn() { len([]) }",
+                vec![make::it!(&Op::Constant, vec![0u16]), make::it!(&Op::Pop)],
+                (vec![
+                    make::it!(&Op::GetBuiltin, vec![0u8]),
+                    make::it!(&Op::Array, vec![0u16]),
+                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::ReturnValue)
+                ])
             ),
         ]);
     }

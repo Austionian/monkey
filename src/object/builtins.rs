@@ -2,11 +2,11 @@ use super::{Object, ObjectType};
 use std::sync::LazyLock;
 
 pub struct Builtin {
-    name: String,
+    pub name: String,
     pub builtin: fn(Vec<ObjectType>) -> ObjectType,
 }
 
-static BUILTINS: LazyLock<Vec<Builtin>> = LazyLock::new(|| {
+pub static BUILTINS: LazyLock<Vec<Builtin>> = LazyLock::new(|| {
     let mut builtins = Vec::new();
 
     macro_rules! builtin {

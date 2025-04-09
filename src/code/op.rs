@@ -33,6 +33,8 @@ pub enum Op {
     GetLocal,
     SetLocal,
 
+    GetBuiltin,
+
     Array,
     Hash,
     Index,
@@ -84,6 +86,7 @@ impl Display for Op {
             Self::Return => write!(f, "OpReturn"),
             Self::GetLocal => write!(f, "OpGetLocal"),
             Self::SetLocal => write!(f, "OpSetLocal"),
+            Self::GetBuiltin => write!(f, "OpGetBuiltin"),
         }
     }
 }
@@ -108,7 +111,7 @@ impl Op {
             | Self::Return
             | Self::Null => vec![],
 
-            Self::GetLocal | Self::SetLocal | Self::Call => vec![1],
+            Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin => vec![1],
 
             Self::Constant
             | Self::Jump

@@ -3,7 +3,8 @@ use std::collections::HashMap;
 // If I don't do it this way I'd need to it to be &'static, and I think
 // we'll be dynamically creating scopes
 pub const GLOBAL_SCOPE: &'static str = "GLOBAL";
-const LOCAL_SCOPE: &'static str = "LOCAL";
+pub const LOCAL_SCOPE: &'static str = "LOCAL";
+pub const BUILTIN_SCOPE: &'static str = "BUILTIN";
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
@@ -70,6 +71,16 @@ impl SymbolTable {
                 return outer.resolve(name);
             }
         }
+        symbol
+    }
+
+    pub fn define_builtin(&mut self, index: usize, name: &str) -> Symbol {
+        let symbol = Symbol {
+            name: name.into(),
+            index,
+            scope: BUILTIN_SCOPE,
+        };
+        self.store.insert(name.into(), symbol.clone());
         symbol
     }
 }
@@ -270,5 +281,58 @@ mod test {
             let result = second_local.resolve(&symbol.name).unwrap();
             assert_eq!(symbol, result);
         })
+    }
+
+    #[test]
+    fn test_define_resolve_builtins() {
+        let mut global = SymbolTable::new();
+        let expected = vec![
+            Symbol {
+                name: "a".into(),
+                scope: BUILTIN_SCOPE,
+                index: 0,
+            },
+            Symbol {
+                name: "c".into(),
+                scope: BUILTIN_SCOPE,
+                index: 1,
+            },
+            Symbol {
+                name: "e".into(),
+                scope: BUILTIN_SCOPE,
+                index: 2,
+            },
+            Symbol {
+                name: "f".into(),
+                scope: BUILTIN_SCOPE,
+                index: 3,
+            },
+        ];
+
+        for (i, v) in expected.iter().enumerate() {
+            global.define_builtin(i, &v.name);
+        }
+
+        let first_local = SymbolTable::new_enclosed(Box::new(global));
+        let second_local = SymbolTable::new_enclosed(Box::new(first_local));
+
+        for symbol in &expected {
+            let result = second_local.resolve(&symbol.name).unwrap();
+            assert_eq!(result, symbol)
+        }
+
+        for symbol in &expected {
+            if let Some(ref outer) = second_local.outer {
+                let result = outer.resolve(&symbol.name).unwrap();
+                assert_eq!(result, symbol);
+
+                for symbol in &expected {
+                    if let Some(ref outer) = outer.outer {
+                        let result = outer.resolve(&symbol.name).unwrap();
+                        assert_eq!(result, symbol)
+                    }
+                }
+            }
+        }
     }
 }

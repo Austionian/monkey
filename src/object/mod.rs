@@ -3,7 +3,7 @@ use crate::{
     ast::{BlockStatement, TokenLiteral},
     token::Token,
 };
-pub use builtins::get_builtin_by_name;
+pub use builtins::{get_builtin_by_name, BUILTINS};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
