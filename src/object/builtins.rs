@@ -1,9 +1,9 @@
-use super::{Object, ObjectType};
+use super::{BuiltinFn, Object, ObjectType};
 use std::sync::LazyLock;
 
 pub struct Builtin {
     pub name: String,
-    pub builtin: fn(Vec<ObjectType>) -> ObjectType,
+    pub builtin: BuiltinFn,
 }
 
 pub static BUILTINS: LazyLock<Vec<Builtin>> = LazyLock::new(|| {
@@ -57,7 +57,7 @@ fn puts(args: Vec<ObjectType>) -> ObjectType {
 fn first(args: Vec<ObjectType>) -> ObjectType {
     if args.len() != 1 {
         return new_error(&format!(
-            "wrong number of arguements. got={}, want=1",
+            "wrong number of arguments. got={}, want=1",
             args.len()
         ));
     }
@@ -66,7 +66,7 @@ fn first(args: Vec<ObjectType>) -> ObjectType {
         array.first().unwrap_or(&ObjectType::NullObj).clone()
     } else {
         new_error(&format!(
-            "arguement to `first` must be ARRAY, got {}",
+            "argument to `first` must be ARRAY, got {}",
             args[0].r#type()
         ))
     }
@@ -75,7 +75,7 @@ fn first(args: Vec<ObjectType>) -> ObjectType {
 fn last(args: Vec<ObjectType>) -> ObjectType {
     if args.len() != 1 {
         return new_error(&format!(
-            "wrong number of arguements. got={}, want=1",
+            "wrong number of arguments. got={}, want=1",
             args.len()
         ));
     }
@@ -84,7 +84,7 @@ fn last(args: Vec<ObjectType>) -> ObjectType {
         array.last().unwrap_or(&ObjectType::NullObj).clone()
     } else {
         new_error(&format!(
-            "arguement to `last` must be ARRAY, got {}",
+            "argument to `last` must be ARRAY, got {}",
             args[0].r#type()
         ))
     }
@@ -93,7 +93,7 @@ fn last(args: Vec<ObjectType>) -> ObjectType {
 fn rest(args: Vec<ObjectType>) -> ObjectType {
     if args.len() != 1 {
         return new_error(&format!(
-            "wrong number of arguements. got={}, want=1",
+            "wrong number of arguments. got={}, want=1",
             args.len()
         ));
     }
@@ -106,7 +106,7 @@ fn rest(args: Vec<ObjectType>) -> ObjectType {
         }
     } else {
         new_error(&format!(
-            "arguement to `rest` must be ARRAY, got {}",
+            "argument to `rest` must be ARRAY, got {}",
             args[0].r#type()
         ))
     }
@@ -120,7 +120,7 @@ fn push(args: Vec<ObjectType>) -> ObjectType {
         ));
     }
     if let ObjectType::ArrayObj(arr) = args[0].r#type() {
-        let mut new_arr = Vec::with_capacity(arr.len());
+        let mut new_arr = vec![ObjectType::NullObj; arr.len()];
         new_arr.clone_from_slice(&arr);
         new_arr.push(args[1].clone());
 

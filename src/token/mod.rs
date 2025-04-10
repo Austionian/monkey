@@ -142,7 +142,7 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 
 fn parse_call_expression(p: &mut Parser, function: Expression) -> Expression {
     // TODO: should maybe be handled as an error instead.
-    let args = p.parse_call_arguements().unwrap_or_default();
+    let args = p.parse_call_arguments().unwrap_or_default();
 
     Expression::CallExpression(Box::new(function), args)
 }

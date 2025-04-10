@@ -3,11 +3,11 @@ mod frame;
 use crate::{
     code::{self, Op},
     compiler::Compiler,
-    object::{HashPair, ObjectType},
+    object::{BuiltinFn, HashPair, ObjectType, BUILTINS},
 };
 use anyhow::{anyhow, bail};
 use frame::Frame;
-use std::collections::HashMap;
+use std::{any, collections::HashMap};
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
@@ -124,7 +124,7 @@ impl<'a> VM<'a> {
                     let num_args = code::read_u8(&instructions[ip + 1..]);
                     self.current_frame().ip += 1;
 
-                    self.call_function(num_args.into())?;
+                    self.execute_call(num_args.into())?;
                 }
                 Op::ReturnValue => {
                     // Gets the functions return value from the stack
@@ -161,37 +161,58 @@ impl<'a> VM<'a> {
 
                     self.push(self.stack[bp + local_index as usize].clone())?;
                 }
-                Op::GetBuiltin => todo!(),
+                Op::GetBuiltin => {
+                    let builtin_index = code::read_u8(&instructions[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let definition = &BUILTINS[builtin_index as usize];
+
+                    self.push(ObjectType::BuiltinFunction(definition.builtin))?;
+                }
             }
         }
 
         Ok(())
     }
 
-    fn call_function(&mut self, num_args: usize) -> anyhow::Result<()> {
+    fn execute_call(&mut self, num_args: usize) -> anyhow::Result<()> {
         // TODO: get rid of this clone and pass frames by reference
-        let func = self.stack[self.sp - 1 - num_args].clone();
-        let (num_locals, num_params) =
-            if let ObjectType::CompileFunction(_, num_locals, num_params) = func {
-                (num_locals, num_params)
-            } else {
-                bail!("callig non-function, found: {:?}", func);
-            };
+        let callee = self.stack[self.sp - 1 - num_args].clone();
 
-        if num_params != num_args {
-            bail!("wrong number of arguements: want={num_params}; got={num_args}");
+        match callee {
+            ObjectType::CompileFunction(_, _, _) => self.call_function(callee, num_args),
+            ObjectType::BuiltinFunction(callee) => self.call_builtin(&callee, num_args),
+            _ => bail!("calling non-function and non-built-in, {:?}", callee),
         }
+    }
 
-        let frame = Frame::new(func, self.sp - num_args);
+    fn call_builtin(&mut self, callee: &BuiltinFn, num_args: usize) -> anyhow::Result<()> {
+        let args = &self.stack[self.sp - num_args..self.sp];
+        let result = callee(args.to_vec());
+        self.sp = self.sp - num_args - 1;
 
-        let Frame {
-            base_pointer: bp, ..
-        } = frame;
+        self.push(result)
+    }
 
-        self.push_frame(frame);
-        self.sp = bp + num_locals;
+    fn call_function(&mut self, callee: ObjectType, num_args: usize) -> anyhow::Result<()> {
+        if let ObjectType::CompileFunction(_, num_locals, num_params) = callee {
+            if num_args != num_params {
+                bail!("wrong number of arguments: want={num_params}; got={num_args}");
+            }
 
-        Ok(())
+            let frame = Frame::new(callee, self.sp - num_args);
+
+            let Frame {
+                base_pointer: bp, ..
+            } = frame;
+
+            self.push_frame(frame);
+            self.sp = bp + num_locals;
+
+            Ok(())
+        } else {
+            unreachable!("`execute_call` already asserted it's a compiled function object")
+        }
     }
 
     fn current_frame(&mut self) -> &mut Frame {
@@ -478,6 +499,9 @@ mod test {
             return test_hash_object(*expected.downcast::<HashMap<u64, f64>>().unwrap(), actual);
         }
 
+        if expected.is::<ObjectType>() {
+            return test_object_type(*expected.downcast::<ObjectType>().unwrap(), actual);
+        }
         // Special null case, probably should be last
         if expected.is::<ObjectType>() {
             if *actual != NULL {
@@ -487,6 +511,18 @@ mod test {
         }
 
         todo!("type not yet ready for testing");
+    }
+
+    fn test_object_type(expected: ObjectType, actual: &ObjectType) {
+        match expected {
+            ObjectType::NullObj => assert_eq!(expected, *actual),
+            ObjectType::ErrorObj(s) => {
+                if let ObjectType::ErrorObj(actual_s) = actual {
+                    assert_eq!(s, *actual_s);
+                }
+            }
+            _ => panic!("object type not handled: {:?}", expected),
+        }
     }
 
     fn test_hash_object(expected: HashMap<u64, f64>, actual: &ObjectType) {
@@ -739,7 +775,7 @@ mod test {
     }
 
     #[test]
-    fn test_frist_class_functions() {
+    fn test_first_class_functions() {
         run_vm_tests(vec![
             vm_test_case!(
                 r#"
@@ -896,19 +932,19 @@ mod test {
                 r#"
                     fn() { 1; }(1);
                 "#,
-                "wrong number of arguements: want=0; got=1"
+                "wrong number of arguments: want=0; got=1"
             ),
             vm_test_case!(
                 r#"
                     fn(a) { a; }();
                 "#,
-                "wrong number of arguements: want=1; got=0"
+                "wrong number of arguments: want=1; got=0"
             ),
             vm_test_case!(
                 r#"
                     fn(a, b) { a + b; }(1);
                 "#,
-                "wrong number of arguements: want=2; got=1"
+                "wrong number of arguments: want=2; got=1"
             ),
         ];
 
@@ -930,5 +966,44 @@ mod test {
                 Err(msg) => assert_eq!(msg.to_string(), *expected_error_msg),
             }
         }
+    }
+
+    #[test]
+    fn test_builtin_funcs() {
+        run_vm_tests(vec![
+            vm_test_case!("len(\"\")", 0f64),
+            vm_test_case!("len(\"four\")", 4f64),
+            vm_test_case!("len(\"hello world\")", 11f64),
+            vm_test_case!(
+                "len(1)",
+                ObjectType::ErrorObj("argument to `len` not supported, got INTEGER".into())
+            ),
+            vm_test_case!(
+                "len(\"one\", \"two\")",
+                ObjectType::ErrorObj("wrong number of arguments. got=2, want=1".into())
+            ),
+            vm_test_case!("len([1,2,3])", 3f64),
+            vm_test_case!("len([])", 0f64),
+            vm_test_case!("puts(\"hello\", \"world\")", NULL),
+            vm_test_case!("first([1,2,3])", 1f64),
+            vm_test_case!("first([])", NULL),
+            vm_test_case!(
+                "first(1)",
+                ObjectType::ErrorObj("argument to `first` must be ARRAY, got INTEGER".into())
+            ),
+            vm_test_case!("last([1,2,3])", 3f64),
+            vm_test_case!("last([])", NULL),
+            vm_test_case!(
+                "last(1)",
+                ObjectType::ErrorObj("argument to `last` must be ARRAY, got INTEGER".into())
+            ),
+            vm_test_case!("rest([1,2,3])", vec![2f64, 3f64]),
+            vm_test_case!("rest([])", NULL),
+            vm_test_case!("push([], 1)", vec![1f64]),
+            vm_test_case!(
+                "push(1, 1)",
+                ObjectType::ErrorObj("argument to `push` must be ARRAY, got INTEGER".into())
+            ),
+        ]);
     }
 }

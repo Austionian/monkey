@@ -174,7 +174,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::ReturnStatement(statement))
     }
 
-    pub fn parse_call_arguements(&mut self) -> Option<Vec<Expression>> {
+    pub fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
         self.parse_expression_list(&Token::RPAREN)
     }
 

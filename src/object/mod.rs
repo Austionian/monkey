@@ -14,7 +14,7 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
-type BuiltIns = fn(Vec<ObjectType>) -> ObjectType;
+pub type BuiltinFn = fn(Vec<ObjectType>) -> ObjectType;
 
 #[derive(Clone, PartialEq, Default, Debug)]
 pub enum ObjectType {
@@ -26,7 +26,7 @@ pub enum ObjectType {
     ErrorObj(String),
     FunctionObj(Function),
     StringObj(String),
-    BuiltinFunction(BuiltIns),
+    BuiltinFunction(BuiltinFn),
     ArrayObj(Vec<ObjectType>),
     HashObj(MapObj),
     // functions bytecode instructions, the number of local variables, the number of params
