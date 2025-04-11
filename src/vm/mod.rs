@@ -29,7 +29,8 @@ pub struct VM<'a> {
 impl<'a> VM<'a> {
     pub fn new(mut compiler: Compiler<'a>, globals: &'a mut [ObjectType; GLOBAL_SIZE]) -> Self {
         let main_func = ObjectType::CompileFunction(compiler.bytecode().instructions, 0, 0);
-        let main_frame = Frame::new(main_func, 0);
+        let main_closure = ObjectType::Closure(Box::new(main_func), vec![]);
+        let main_frame = Frame::new(main_closure, 0);
 
         let mut frames = [const { Frame::default() }; FRAME_SIZE];
         frames[0] = main_frame;
@@ -169,11 +170,26 @@ impl<'a> VM<'a> {
 
                     self.push(ObjectType::BuiltinFunction(definition.builtin))?;
                 }
-                Op::Closure => todo!(),
+                Op::Closure => {
+                    let const_index = code::read_u16(&instructions[ip + 1..]);
+                    let _ = code::read_u8(&instructions[ip + 3..]);
+                    self.current_frame().ip += 3;
+
+                    self.push_closure(const_index as usize)?;
+                }
             }
         }
 
         Ok(())
+    }
+
+    fn push_closure(&mut self, const_index: usize) -> anyhow::Result<()> {
+        let constant = &self.constants[const_index];
+        if let ObjectType::CompileFunction(_, _, _) = constant {
+            self.push(ObjectType::Closure(Box::new(constant.clone()), vec![]))
+        } else {
+            bail!("not a function: {:?}", constant)
+        }
     }
 
     fn execute_call(&mut self, num_args: usize) -> anyhow::Result<()> {
@@ -181,7 +197,7 @@ impl<'a> VM<'a> {
         let callee = self.stack[self.sp - 1 - num_args].clone();
 
         match callee {
-            ObjectType::CompileFunction(_, _, _) => self.call_function(callee, num_args),
+            ObjectType::Closure(_, _) => self.call_closure(callee, num_args),
             ObjectType::BuiltinFunction(callee) => self.call_builtin(&callee, num_args),
             _ => bail!("calling non-function and non-built-in, {:?}", callee),
         }
@@ -195,24 +211,28 @@ impl<'a> VM<'a> {
         self.push(result)
     }
 
-    fn call_function(&mut self, callee: ObjectType, num_args: usize) -> anyhow::Result<()> {
-        if let ObjectType::CompileFunction(_, num_locals, num_params) = callee {
-            if num_args != num_params {
-                bail!("wrong number of arguments: want={num_params}; got={num_args}");
+    fn call_closure(&mut self, callee: ObjectType, num_args: usize) -> anyhow::Result<()> {
+        if let ObjectType::Closure(ref func, _) = callee {
+            if let ObjectType::CompileFunction(_, num_locals, num_params) = func.as_ref() {
+                if num_args != *num_params {
+                    bail!("wrong number of arguments: want={num_params}; got={num_args}");
+                }
+
+                let frame = Frame::new(callee.clone(), self.sp - num_args);
+
+                let Frame {
+                    base_pointer: bp, ..
+                } = frame;
+
+                self.push_frame(frame);
+                self.sp = bp + num_locals;
+
+                Ok(())
+            } else {
+                unreachable!("only compiled functions are in closures")
             }
-
-            let frame = Frame::new(callee, self.sp - num_args);
-
-            let Frame {
-                base_pointer: bp, ..
-            } = frame;
-
-            self.push_frame(frame);
-            self.sp = bp + num_locals;
-
-            Ok(())
         } else {
-            unreachable!("`execute_call` already asserted it's a compiled function object")
+            todo!()
         }
     }
 

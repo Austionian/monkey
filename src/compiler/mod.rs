@@ -228,7 +228,7 @@ impl Compile for Expression {
 
                 let constant = compiler.add_constant(compiled_fn);
 
-                compiler.emit(&Op::Constant, vec![constant]);
+                compiler.emit(&Op::Closure, vec![constant, 0]);
             }
             Self::CallExpression(function, args) => {
                 function.compile(compiler)?;
@@ -444,8 +444,6 @@ impl<'a> Compiler<'a> {
             instructions: self.current_instructions().to_vec(),
         }
     }
-
-    fn load_symbol(&mut self, s: Symbol) {}
 }
 
 #[cfg(test)]
@@ -926,7 +924,7 @@ mod test {
         run_compiler_tests(vec![
             compiler_test_case!(
                 "fn() { return 5 + 10 }",
-                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Closure, vec![2, 0]), make::it!(&Op::Pop)],
                 (
                     5.0,
                     10.0,
@@ -940,7 +938,7 @@ mod test {
             ),
             compiler_test_case!(
                 "fn() { 5 + 10 }",
-                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Closure, vec![2, 0]), make::it!(&Op::Pop)],
                 (
                     5.0,
                     10.0,
@@ -954,7 +952,7 @@ mod test {
             ),
             compiler_test_case!(
                 "fn() { 1; 2 }",
-                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Closure, vec![2, 0]), make::it!(&Op::Pop)],
                 (
                     1.0,
                     2.0,
@@ -969,7 +967,7 @@ mod test {
             compiler_test_case!(
                 "fn() { 24 }()",
                 vec![
-                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Closure, vec![1, 0]),
                     make::it!(&Op::Call, vec![0]),
                     make::it!(&Op::Pop)
                 ],
@@ -987,7 +985,7 @@ mod test {
                     noArg();
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![1]), // the compiled function
+                    make::it!(&Op::Closure, vec![1, 0]), // the compiled function
                     make::it!(&Op::SetGlobal, vec![0]),
                     make::it!(&Op::GetGlobal, vec![0]),
                     make::it!(&Op::Call, vec![0]),
@@ -1008,7 +1006,7 @@ mod test {
     fn test_functions_without_return_value() {
         run_compiler_tests(vec![compiler_test_case!(
             "fn() { }",
-            vec![make::it!(&Op::Constant, vec![0]), make::it!(&Op::Pop)],
+            vec![make::it!(&Op::Closure, vec![0, 0]), make::it!(&Op::Pop)],
             (vec![make::it!(&Op::Return)])
         )]);
     }
@@ -1065,7 +1063,7 @@ mod test {
                 vec![
                     make::it!(&Op::Constant, vec![0]),
                     make::it!(&Op::SetGlobal, vec![0]),
-                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Closure, vec![1, 0]),
                     make::it!(&Op::Pop),
                 ],
                 (
@@ -1083,7 +1081,7 @@ mod test {
                         num
                     }
                 "#,
-                vec![make::it!(&Op::Constant, vec![1]), make::it!(&Op::Pop),],
+                vec![make::it!(&Op::Closure, vec![1, 0]), make::it!(&Op::Pop),],
                 (
                     55.0,
                     vec![
@@ -1102,7 +1100,7 @@ mod test {
                         a + b
                     }
                 "#,
-                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Closure, vec![2, 0]), make::it!(&Op::Pop)],
                 (
                     55.0,
                     77.0,
@@ -1132,7 +1130,7 @@ mod test {
                     oneArg(24);
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Closure, vec![0, 0]),
                     make::it!(&Op::SetGlobal, vec![0]),
                     make::it!(&Op::GetGlobal, vec![0]),
                     make::it!(&Op::Constant, vec![1]),
@@ -1155,7 +1153,7 @@ mod test {
                     manyArg(24, 25, 26);
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Closure, vec![0, 0]),
                     make::it!(&Op::SetGlobal, vec![0]),
                     make::it!(&Op::GetGlobal, vec![0]),
                     make::it!(&Op::Constant, vec![1]),
@@ -1204,7 +1202,7 @@ mod test {
             ),
             compiler_test_case!(
                 "fn() { len([]) }",
-                vec![make::it!(&Op::Constant, vec![0]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Closure, vec![0, 0]), make::it!(&Op::Pop)],
                 (vec![
                     make::it!(&Op::GetBuiltin, vec![0]),
                     make::it!(&Op::Array, vec![0]),

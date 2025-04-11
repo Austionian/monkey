@@ -32,7 +32,7 @@ pub enum ObjectType {
     // functions bytecode instructions, the number of local variables, the number of params
     CompileFunction(Vec<u8>, usize, usize),
     // compiled function, free variables
-    Closure(Vec<u8>, Vec<ObjectType>),
+    Closure(Box<Self>, Vec<ObjectType>),
 }
 
 impl ObjectType {
