@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use frame::Frame;
-use std::{any, collections::HashMap};
+use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
@@ -169,6 +169,7 @@ impl<'a> VM<'a> {
 
                     self.push(ObjectType::BuiltinFunction(definition.builtin))?;
                 }
+                Op::Closure => todo!(),
             }
         }
 

@@ -31,6 +31,8 @@ pub enum ObjectType {
     HashObj(MapObj),
     // functions bytecode instructions, the number of local variables, the number of params
     CompileFunction(Vec<u8>, usize, usize),
+    // compiled function, free variables
+    Closure(Vec<u8>, Vec<ObjectType>),
 }
 
 impl ObjectType {
@@ -94,6 +96,9 @@ impl Object for ObjectType {
             Self::CompileFunction(f, _, _) => {
                 format!("{f:?}")
             }
+            Self::Closure(f, _) => {
+                format!("{f:?}")
+            }
         }
     }
 }
@@ -112,6 +117,7 @@ impl Display for ObjectType {
             Self::ArrayObj(_) => write!(f, "ARRAY"),
             Self::HashObj(_) => write!(f, "HASH"),
             Self::CompileFunction(_, _, _) => write!(f, "COMPILED FUNCTION"),
+            Self::Closure(_, _) => write!(f, "CLOSURE"),
         }
     }
 }

@@ -390,26 +390,9 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn emit(&mut self, op: &Op, operands: Vec<usize>) -> usize {
-        // TODO: this still doesn't make sense, why a vec of ops
-        // maybe this should be generic like make? And only the correct
-        // sizes get passed in?
-        let mut ins: Vec<u8> = vec![];
-        for width in op.lookup_widths() {
-            match width {
-                2 => {
-                    ins = make::it!(op, operands.iter().map(|x| *x as u16));
-                }
-                1 => ins = make::it!(op, operands.iter().map(|x| *x as u8)),
-                _ => todo!(),
-            };
-        }
+        let mut ins = make::it!(op, operands);
 
-        let pos;
-        if operands.is_empty() {
-            pos = self.add_instruction(&mut vec![*op as u8]);
-        } else {
-            pos = self.add_instruction(&mut ins);
-        }
+        let pos = self.add_instruction(&mut ins);
 
         self.set_last_instruction(op, pos);
 
@@ -418,7 +401,7 @@ impl<'a> Compiler<'a> {
 
     fn change_operand(&mut self, op_position: usize, operand: usize) {
         let op = self.current_instructions()[op_position];
-        let new_instruction = make::it!(&op.into(), vec![operand as u16]);
+        let new_instruction = make::it!(&op.into(), vec![operand]);
 
         self.replace_instruction(op_position, new_instruction);
     }
@@ -592,8 +575,8 @@ mod test {
             compiler_test_case!(
                 "1 + 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Add),
                     make::it!(&Op::Pop),
                 ],
@@ -602,9 +585,9 @@ mod test {
             compiler_test_case!(
                 "1; 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![0]),
                     make::it!(&Op::Pop),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0)
@@ -612,8 +595,8 @@ mod test {
             compiler_test_case!(
                 "1 - 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Sub),
                     make::it!(&Op::Pop),
                 ],
@@ -622,8 +605,8 @@ mod test {
             compiler_test_case!(
                 "1 * 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Mul),
                     make::it!(&Op::Pop),
                 ],
@@ -632,8 +615,8 @@ mod test {
             compiler_test_case!(
                 "2 / 1",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Div),
                     make::it!(&Op::Pop),
                 ],
@@ -642,7 +625,7 @@ mod test {
             compiler_test_case!(
                 "-1",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
+                    make::it!(&Op::Constant, vec![0]),
                     make::it!(&Op::Minus),
                     make::it!(&Op::Pop),
                 ],
@@ -665,8 +648,8 @@ mod test {
             compiler_test_case!(
                 "1 > 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::GreaterThan),
                     make::it!(&Op::Pop),
                 ],
@@ -675,8 +658,8 @@ mod test {
             compiler_test_case!(
                 "1 < 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::GreaterThan),
                     make::it!(&Op::Pop),
                 ],
@@ -685,8 +668,8 @@ mod test {
             compiler_test_case!(
                 "1 == 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Equal),
                     make::it!(&Op::Pop),
                 ],
@@ -695,8 +678,8 @@ mod test {
             compiler_test_case!(
                 "1 != 2",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::NotEqual),
                     make::it!(&Op::Pop),
                 ],
@@ -729,12 +712,12 @@ mod test {
                 "if (true) { 10 }; 3333;",
                 vec![
                     make::it!(&Op::True),
-                    make::it!(&Op::JumpNotTruthy, vec![10u16]),
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Jump, vec![11u16]),
+                    make::it!(&Op::JumpNotTruthy, vec![10]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Jump, vec![11]),
                     make::it!(&Op::Null),
                     make::it!(&Op::Pop),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Pop),
                 ],
                 (10.0, 3333.0)
@@ -743,12 +726,12 @@ mod test {
                 "if (true) { 10 } else { 20 }; 3333;",
                 vec![
                     make::it!(&Op::True),
-                    make::it!(&Op::JumpNotTruthy, vec![10u16]),
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Jump, vec![13u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::JumpNotTruthy, vec![10]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Jump, vec![13]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Pop),
-                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![2]),
                     make::it!(&Op::Pop),
                 ],
                 (10.0, 20.0, 3333.0)
@@ -765,10 +748,10 @@ mod test {
                     let two = 2;
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::SetGlobal, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::SetGlobal, vec![1]),
                 ],
                 (1.0, 2.0)
             ),
@@ -778,9 +761,9 @@ mod test {
                     one;
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::GetGlobal, vec![0u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0)
@@ -792,11 +775,11 @@ mod test {
                     two;
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::GetGlobal, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![1u16]),
-                    make::it!(&Op::GetGlobal, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![1]),
+                    make::it!(&Op::GetGlobal, vec![1]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0)
@@ -809,14 +792,14 @@ mod test {
         run_compiler_tests(vec![
             compiler_test_case!(
                 r#""monkey""#,
-                vec![make::it!(&Op::Constant, vec![0u16]), make::it!(&Op::Pop),],
+                vec![make::it!(&Op::Constant, vec![0]), make::it!(&Op::Pop),],
                 ("monkey")
             ),
             compiler_test_case!(
                 r#""mon" + "key""#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Add),
                     make::it!(&Op::Pop),
                 ],
@@ -830,15 +813,15 @@ mod test {
         run_compiler_tests(vec![
             compiler_test_case!(
                 "[]",
-                vec![make::it!(&Op::Array, vec![0u16]), make::it!(&Op::Pop)]
+                vec![make::it!(&Op::Array, vec![0]), make::it!(&Op::Pop)]
             ),
             compiler_test_case!(
                 "[1, 2, 3]",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Array, vec![3u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Array, vec![3]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0, 3.0)
@@ -846,16 +829,16 @@ mod test {
             compiler_test_case!(
                 "[1 + 2, 3 - 4, 5 * 6]",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Add),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Constant, vec![3]),
                     make::it!(&Op::Sub),
-                    make::it!(&Op::Constant, vec![4u16]),
-                    make::it!(&Op::Constant, vec![5u16]),
+                    make::it!(&Op::Constant, vec![4]),
+                    make::it!(&Op::Constant, vec![5]),
                     make::it!(&Op::Mul),
-                    make::it!(&Op::Array, vec![3u16]),
+                    make::it!(&Op::Array, vec![3]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
@@ -868,18 +851,18 @@ mod test {
         run_compiler_tests(vec![
             compiler_test_case!(
                 "{}",
-                vec![make::it!(&Op::Hash, vec![0u16]), make::it!(&Op::Pop)]
+                vec![make::it!(&Op::Hash, vec![0]), make::it!(&Op::Pop)]
             ),
             compiler_test_case!(
                 "{1: 2, 3: 4, 5: 6}",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Constant, vec![3u16]),
-                    make::it!(&Op::Constant, vec![4u16]),
-                    make::it!(&Op::Constant, vec![5u16]),
-                    make::it!(&Op::Hash, vec![6u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Constant, vec![3]),
+                    make::it!(&Op::Constant, vec![4]),
+                    make::it!(&Op::Constant, vec![5]),
+                    make::it!(&Op::Hash, vec![6]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
@@ -887,15 +870,15 @@ mod test {
             compiler_test_case!(
                 "{1: 2 + 3, 4: 5 * 6}",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Constant, vec![2]),
                     make::it!(&Op::Add),
-                    make::it!(&Op::Constant, vec![3u16]),
-                    make::it!(&Op::Constant, vec![4u16]),
-                    make::it!(&Op::Constant, vec![5u16]),
+                    make::it!(&Op::Constant, vec![3]),
+                    make::it!(&Op::Constant, vec![4]),
+                    make::it!(&Op::Constant, vec![5]),
                     make::it!(&Op::Mul),
-                    make::it!(&Op::Hash, vec![4u16]),
+                    make::it!(&Op::Hash, vec![4]),
                     make::it!(&Op::Pop),
                 ],
                 (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
@@ -909,12 +892,12 @@ mod test {
             compiler_test_case!(
                 "[1,2,3][1 + 1]",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Array, vec![3u16]),
-                    make::it!(&Op::Constant, vec![3u16]),
-                    make::it!(&Op::Constant, vec![4u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Array, vec![3]),
+                    make::it!(&Op::Constant, vec![3]),
+                    make::it!(&Op::Constant, vec![4]),
                     make::it!(&Op::Add),
                     make::it!(&Op::Index),
                     make::it!(&Op::Pop),
@@ -924,11 +907,11 @@ mod test {
             compiler_test_case!(
                 "{1: 2}[2 - 1]",
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Hash, vec![2u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Constant, vec![3u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Hash, vec![2]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Constant, vec![3]),
                     make::it!(&Op::Sub),
                     make::it!(&Op::Index),
                     make::it!(&Op::Pop),
@@ -943,13 +926,13 @@ mod test {
         run_compiler_tests(vec![
             compiler_test_case!(
                 "fn() { return 5 + 10 }",
-                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
                 (
                     5.0,
                     10.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::Constant, vec![1u16]),
+                        make::it!(&Op::Constant, vec![0]),
+                        make::it!(&Op::Constant, vec![1]),
                         make::it!(&Op::Add),
                         make::it!(&Op::ReturnValue)
                     ]
@@ -957,13 +940,13 @@ mod test {
             ),
             compiler_test_case!(
                 "fn() { 5 + 10 }",
-                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
                 (
                     5.0,
                     10.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::Constant, vec![1u16]),
+                        make::it!(&Op::Constant, vec![0]),
+                        make::it!(&Op::Constant, vec![1]),
                         make::it!(&Op::Add),
                         make::it!(&Op::ReturnValue)
                     ]
@@ -971,14 +954,14 @@ mod test {
             ),
             compiler_test_case!(
                 "fn() { 1; 2 }",
-                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
                 (
                     1.0,
                     2.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
+                        make::it!(&Op::Constant, vec![0]),
                         make::it!(&Op::Pop),
-                        make::it!(&Op::Constant, vec![1u16]),
+                        make::it!(&Op::Constant, vec![1]),
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -986,14 +969,14 @@ mod test {
             compiler_test_case!(
                 "fn() { 24 }()",
                 vec![
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Call, vec![0u8]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Call, vec![0]),
                     make::it!(&Op::Pop)
                 ],
                 (
                     24.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
+                        make::it!(&Op::Constant, vec![0]),
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -1004,16 +987,16 @@ mod test {
                     noArg();
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![1u16]), // the compiled function
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::GetGlobal, vec![0u16]),
-                    make::it!(&Op::Call, vec![0u8]),
+                    make::it!(&Op::Constant, vec![1]), // the compiled function
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::Call, vec![0]),
                     make::it!(&Op::Pop)
                 ],
                 (
                     24.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]), // the literal 24
+                        make::it!(&Op::Constant, vec![0]), // the literal 24
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -1025,7 +1008,7 @@ mod test {
     fn test_functions_without_return_value() {
         run_compiler_tests(vec![compiler_test_case!(
             "fn() { }",
-            vec![make::it!(&Op::Constant, vec![0u16]), make::it!(&Op::Pop)],
+            vec![make::it!(&Op::Constant, vec![0]), make::it!(&Op::Pop)],
             (vec![make::it!(&Op::Return)])
         )]);
     }
@@ -1080,15 +1063,15 @@ mod test {
                     fn() { num }
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
                     make::it!(&Op::Pop),
                 ],
                 (
                     55.0,
                     vec![
-                        make::it!(&Op::GetGlobal, vec![0u16]),
+                        make::it!(&Op::GetGlobal, vec![0]),
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -1100,13 +1083,13 @@ mod test {
                         num
                     }
                 "#,
-                vec![make::it!(&Op::Constant, vec![1u16]), make::it!(&Op::Pop),],
+                vec![make::it!(&Op::Constant, vec![1]), make::it!(&Op::Pop),],
                 (
                     55.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::SetLocal, vec![0u8]),
-                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::Constant, vec![0]),
+                        make::it!(&Op::SetLocal, vec![0]),
+                        make::it!(&Op::GetLocal, vec![0]),
                         make::it!(&Op::ReturnValue)
                     ]
                 )
@@ -1119,17 +1102,17 @@ mod test {
                         a + b
                     }
                 "#,
-                vec![make::it!(&Op::Constant, vec![2u16]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Constant, vec![2]), make::it!(&Op::Pop)],
                 (
                     55.0,
                     77.0,
                     vec![
-                        make::it!(&Op::Constant, vec![0u16]),
-                        make::it!(&Op::SetLocal, vec![0u8]),
-                        make::it!(&Op::Constant, vec![1u16]),
-                        make::it!(&Op::SetLocal, vec![1u8]),
-                        make::it!(&Op::GetLocal, vec![0u8]),
-                        make::it!(&Op::GetLocal, vec![1u8]),
+                        make::it!(&Op::Constant, vec![0]),
+                        make::it!(&Op::SetLocal, vec![0]),
+                        make::it!(&Op::Constant, vec![1]),
+                        make::it!(&Op::SetLocal, vec![1]),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::GetLocal, vec![1]),
                         make::it!(&Op::Add),
                         make::it!(&Op::ReturnValue)
                     ]
@@ -1149,16 +1132,16 @@ mod test {
                     oneArg(24);
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::GetGlobal, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Call, vec![1]),
                     make::it!(&Op::Pop),
                 ],
                 (
                     vec![
-                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::GetLocal, vec![0]),
                         make::it!(&Op::ReturnValue)
                     ],
                     24.0
@@ -1172,22 +1155,22 @@ mod test {
                     manyArg(24, 25, 26);
                 "#,
                 vec![
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::SetGlobal, vec![0u16]),
-                    make::it!(&Op::GetGlobal, vec![0u16]),
-                    make::it!(&Op::Constant, vec![1u16]),
-                    make::it!(&Op::Constant, vec![2u16]),
-                    make::it!(&Op::Constant, vec![3u16]),
-                    make::it!(&Op::Call, vec![3u8]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Constant, vec![2]),
+                    make::it!(&Op::Constant, vec![3]),
+                    make::it!(&Op::Call, vec![3]),
                     make::it!(&Op::Pop),
                 ],
                 (
                     vec![
-                        make::it!(&Op::GetLocal, vec![0u8]),
+                        make::it!(&Op::GetLocal, vec![0]),
                         make::it!(&Op::Pop),
-                        make::it!(&Op::GetLocal, vec![1u8]),
+                        make::it!(&Op::GetLocal, vec![1]),
                         make::it!(&Op::Pop),
-                        make::it!(&Op::GetLocal, vec![2u8]),
+                        make::it!(&Op::GetLocal, vec![2]),
                         make::it!(&Op::ReturnValue)
                     ],
                     24.0,
@@ -1207,25 +1190,25 @@ mod test {
                     push([], 1);
                 "#,
                 vec![
-                    make::it!(&Op::GetBuiltin, vec![0u8]),
-                    make::it!(&Op::Array, vec![0u16]),
-                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::GetBuiltin, vec![0]),
+                    make::it!(&Op::Array, vec![0]),
+                    make::it!(&Op::Call, vec![1]),
                     make::it!(&Op::Pop),
-                    make::it!(&Op::GetBuiltin, vec![5u8]),
-                    make::it!(&Op::Array, vec![0u16]),
-                    make::it!(&Op::Constant, vec![0u16]),
-                    make::it!(&Op::Call, vec![2u8]),
+                    make::it!(&Op::GetBuiltin, vec![5]),
+                    make::it!(&Op::Array, vec![0]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Call, vec![2]),
                     make::it!(&Op::Pop)
                 ],
                 (1.0)
             ),
             compiler_test_case!(
                 "fn() { len([]) }",
-                vec![make::it!(&Op::Constant, vec![0u16]), make::it!(&Op::Pop)],
+                vec![make::it!(&Op::Constant, vec![0]), make::it!(&Op::Pop)],
                 (vec![
-                    make::it!(&Op::GetBuiltin, vec![0u8]),
-                    make::it!(&Op::Array, vec![0u16]),
-                    make::it!(&Op::Call, vec![1u8]),
+                    make::it!(&Op::GetBuiltin, vec![0]),
+                    make::it!(&Op::Array, vec![0]),
+                    make::it!(&Op::Call, vec![1]),
                     make::it!(&Op::ReturnValue)
                 ])
             ),

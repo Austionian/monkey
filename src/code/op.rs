@@ -42,6 +42,8 @@ pub enum Op {
     Call,
     Return,
     ReturnValue,
+
+    Closure,
 }
 
 impl Into<u8> for Op {
@@ -87,6 +89,7 @@ impl Display for Op {
             Self::GetLocal => write!(f, "OpGetLocal"),
             Self::SetLocal => write!(f, "OpSetLocal"),
             Self::GetBuiltin => write!(f, "OpGetBuiltin"),
+            Self::Closure => write!(f, "OpClosure"),
         }
     }
 }
@@ -120,6 +123,8 @@ impl Op {
             | Self::SetGlobal
             | Self::Array
             | Self::Hash => vec![2],
+
+            Self::Closure => vec![2, 1],
         }
     }
 }
