@@ -1,6 +1,5 @@
 use crate::{
     ast::{Expression, Map, TokenLiteral},
-    object::ObjectType,
     parser::{ExpressionPrecendence, Parser},
 };
 use std::fmt::Display;

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 // If I don't do it this way I'd need to it to be &'static, and I think
 // we'll be dynamically creating scopes
-pub const GLOBAL_SCOPE: &'static str = "GLOBAL";
-pub const LOCAL_SCOPE: &'static str = "LOCAL";
-pub const BUILTIN_SCOPE: &'static str = "BUILTIN";
+pub const GLOBAL_SCOPE: &str = "GLOBAL";
+pub const LOCAL_SCOPE: &str = "LOCAL";
+pub const BUILTIN_SCOPE: &str = "BUILTIN";
 
 #[derive(Debug, Clone)]
 pub struct Symbol {

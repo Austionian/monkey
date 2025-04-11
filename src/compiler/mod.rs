@@ -7,7 +7,7 @@ use crate::{
     object::{self, ObjectType},
     token::Token,
 };
-use symbol_table::{Symbol, SymbolTable, BUILTIN_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
+use symbol_table::{SymbolTable, BUILTIN_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
 use thiserror::Error;
 
 pub struct Compiler<'a> {

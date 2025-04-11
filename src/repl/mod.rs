@@ -10,7 +10,7 @@ use std::{
     process::{self},
 };
 
-const PROMPT: &'static str = ">> ";
+const PROMPT: &str = ">> ";
 
 pub fn start<'a>(
     constants: &'a mut Vec<ObjectType>,

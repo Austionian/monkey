@@ -1,4 +1,4 @@
-use crate::{code::Instructions, object::ObjectType};
+use crate::object::ObjectType;
 
 #[derive(Debug, Clone)]
 pub(super) struct Frame {
