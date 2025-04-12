@@ -177,6 +177,7 @@ impl<'a> VM<'a> {
 
                     self.push_closure(const_index as usize)?;
                 }
+                Op::GetFree => todo!(),
             }
         }
 

@@ -7,7 +7,7 @@ use crate::{
     object::{self, ObjectType},
     token::Token,
 };
-use symbol_table::{SymbolTable, BUILTIN_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
+use symbol_table::{Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
 use thiserror::Error;
 
 pub struct Compiler<'a> {
@@ -160,7 +160,8 @@ impl Compile for Expression {
                     GLOBAL_SCOPE => compiler.emit(&Op::GetGlobal, vec![symbol.index]),
                     LOCAL_SCOPE => compiler.emit(&Op::GetLocal, vec![symbol.index]),
                     BUILTIN_SCOPE => compiler.emit(&Op::GetBuiltin, vec![symbol.index]),
-                    _ => unreachable!("there should only be three scopes!"),
+                    FREE_SCOPE => compiler.emit(&Op::GetFree, vec![symbol.index]),
+                    _ => unreachable!("there should only be four scopes!"),
                 };
             }
             Self::StringExpression(string) => {
@@ -222,13 +223,20 @@ impl Compile for Expression {
                     compiler.emit(&Op::Return, vec![]);
                 }
 
+                let free_symbols = compiler.symbol_table.free_symbols.clone();
                 let num_locals = compiler.symbol_table.num_definitions;
+                let instructions = compiler.leave_scope();
+
+                for symbol in free_symbols.borrow().iter() {
+                    compiler.load_symbol(symbol);
+                }
+
                 let compiled_fn =
-                    ObjectType::CompileFunction(compiler.leave_scope(), num_locals, params.len());
+                    ObjectType::CompileFunction(instructions, num_locals, params.len());
 
                 let constant = compiler.add_constant(compiled_fn);
 
-                compiler.emit(&Op::Closure, vec![constant, 0]);
+                compiler.emit(&Op::Closure, vec![constant, free_symbols.borrow().len()]);
             }
             Self::CallExpression(function, args) => {
                 function.compile(compiler)?;
@@ -437,6 +445,16 @@ impl<'a> Compiler<'a> {
         self.current_instructions().append(ins);
 
         pos_new_instruction
+    }
+
+    pub fn load_symbol(&mut self, symbol: &Symbol) {
+        match symbol.scope {
+            GLOBAL_SCOPE => self.emit(&Op::GetGlobal, vec![symbol.index]),
+            LOCAL_SCOPE => self.emit(&Op::GetLocal, vec![symbol.index]),
+            BUILTIN_SCOPE => self.emit(&Op::GetBuiltin, vec![symbol.index]),
+            FREE_SCOPE => self.emit(&Op::GetFree, vec![symbol.index]),
+            _ => unreachable!("there should only be four scopes!"),
+        };
     }
 
     pub fn bytecode(&mut self) -> ByteCode {
@@ -1211,5 +1229,123 @@ mod test {
                 ])
             ),
         ]);
+    }
+
+    #[test]
+    fn test_closures() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                fn(a) {
+                    fn(b) {
+                        a + b
+                    }
+                }
+            "#,
+                vec![make::it!(&Op::Closure, vec![1, 0]), make::it!(&Op::Pop),],
+                (
+                    vec![
+                        make::it!(&Op::GetFree, vec![0]),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::ReturnValue),
+                    ],
+                    vec![
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Closure, vec![0, 1]),
+                        make::it!(&Op::ReturnValue),
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                r#"
+                    fn(a) {
+                        fn(b) {
+                            fn(c) {
+                                a + b + c
+                            }
+                        }
+                    };
+                "#,
+                vec![make::it!(&Op::Closure, vec![2, 0]), make::it!(&Op::Pop),],
+                (
+                    vec![
+                        make::it!(&Op::GetFree, vec![0]),
+                        make::it!(&Op::GetFree, vec![1]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::ReturnValue),
+                    ],
+                    vec![
+                        make::it!(&Op::GetFree, vec![0]),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Closure, vec![0, 2]),
+                        make::it!(&Op::ReturnValue),
+                    ],
+                    vec![
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Closure, vec![1, 1]),
+                        make::it!(&Op::ReturnValue),
+                    ]
+                )
+            ),
+            compiler_test_case!(
+                r#"let global = 55;
+
+                fn() {
+                    let a = 66;
+
+                    fn() {
+                        let b = 77;
+
+                        fn() {
+                            let c = 88;
+
+                            global + a + b + c;
+                        }
+                    }
+                }"#,
+                vec![
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::Closure, vec![6, 0]),
+                    make::it!(&Op::Pop),
+                ],
+                (
+                    55.0,
+                    66.0,
+                    77.0,
+                    88.0,
+                    vec![
+                        make::it!(&Op::Constant, vec![3]),
+                        make::it!(&Op::SetLocal, vec![0]),
+                        make::it!(&Op::GetGlobal, vec![0]),
+                        make::it!(&Op::GetFree, vec![0]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::GetFree, vec![1]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Add),
+                        make::it!(&Op::ReturnValue),
+                    ],
+                    vec![
+                        make::it!(&Op::Constant, vec![2]),
+                        make::it!(&Op::SetLocal, vec![0]),
+                        make::it!(&Op::GetFree, vec![0]),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Closure, vec![4, 2]),
+                        make::it!(&Op::ReturnValue),
+                    ],
+                    vec![
+                        make::it!(&Op::Constant, vec![1]),
+                        make::it!(&Op::SetLocal, vec![0]),
+                        make::it!(&Op::GetLocal, vec![0]),
+                        make::it!(&Op::Closure, vec![5, 1]),
+                        make::it!(&Op::ReturnValue),
+                    ]
+                )
+            ),
+        ])
     }
 }

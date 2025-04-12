@@ -33,6 +33,8 @@ pub enum Op {
     GetLocal,
     SetLocal,
 
+    GetFree,
+
     GetBuiltin,
 
     Array,
@@ -90,6 +92,7 @@ impl Display for Op {
             Self::SetLocal => write!(f, "OpSetLocal"),
             Self::GetBuiltin => write!(f, "OpGetBuiltin"),
             Self::Closure => write!(f, "OpClosure"),
+            Self::GetFree => write!(f, "OpGetFree"),
         }
     }
 }
@@ -114,7 +117,9 @@ impl Op {
             | Self::Return
             | Self::Null => vec![],
 
-            Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin => vec![1],
+            Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin | Self::GetFree => {
+                vec![1]
+            }
 
             Self::Constant
             | Self::Jump
