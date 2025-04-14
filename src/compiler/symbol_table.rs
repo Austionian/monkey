@@ -10,6 +10,7 @@ pub const GLOBAL_SCOPE: &str = "GLOBAL";
 pub const LOCAL_SCOPE: &str = "LOCAL";
 pub const BUILTIN_SCOPE: &str = "BUILTIN";
 pub const FREE_SCOPE: &str = "FREE";
+pub const FUNCTION_SCOPE: &str = "FUNCTION";
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
@@ -68,6 +69,17 @@ impl SymbolTable {
 
         self.store.borrow_mut().insert(name, symbol.clone());
         self.num_definitions += 1;
+
+        symbol
+    }
+
+    pub fn define_function_name(&mut self, name: String) -> Symbol {
+        let symbol = Symbol {
+            name: name.clone(),
+            index: 0,
+            scope: FUNCTION_SCOPE,
+        };
+        self.store.borrow_mut().insert(name, symbol.clone());
 
         symbol
     }
@@ -576,5 +588,36 @@ mod test {
         for name in expected_unresolvable {
             assert!(second_local.resolve(&name).is_none());
         }
+    }
+
+    #[test]
+    fn test_define_and_resolve_function_name() {
+        let mut global = SymbolTable::new();
+        global.define_function_name("a".into());
+
+        let expected = Symbol {
+            name: "a".into(),
+            scope: FUNCTION_SCOPE,
+            index: 0,
+        };
+
+        let result = global.resolve("a").unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_shadow_function_name() {
+        let mut global = SymbolTable::new();
+        global.define_function_name("a".into());
+        global.define("a".into());
+
+        let expected = Symbol {
+            name: "a".into(),
+            scope: GLOBAL_SCOPE,
+            index: 0,
+        };
+
+        let result = global.resolve("a").unwrap();
+        assert_eq!(result, expected);
     }
 }

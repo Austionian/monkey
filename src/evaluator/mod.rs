@@ -87,7 +87,7 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
             eval_if_expression(&condition, &consequence, &alt, env)
         }
         Expression::IdentExpression(ident) => eval_ident(&ident, env),
-        Expression::FunctionLiteral(_, parameters, body) => ObjectType::FunctionObj(Function {
+        Expression::FunctionLiteral(_, parameters, body, _) => ObjectType::FunctionObj(Function {
             parameters: parameters.to_vec(),
             body: body.clone(),
             // TODO: don't clone the env

@@ -201,6 +201,11 @@ impl<'a> Parser<'a> {
             .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("failed to parse expression")?;
 
+        if let Expression::FunctionLiteral(_, _, _, ref rc) = statement.value {
+            let mut name = rc.borrow_mut();
+            *name = Some(statement.name.to_string());
+        }
+
         if self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
         }
@@ -723,7 +728,7 @@ mod test {
 
         match &program.statements[0] {
             Statement::ExpressStatement(expression) => match &expression {
-                Expression::FunctionLiteral(_, params, body) => {
+                Expression::FunctionLiteral(_, params, body, _) => {
                     assert_eq!(params.len(), 2);
                     if let Token::IDENT(x) = &params[0] {
                         assert_eq!(x, "x");
@@ -756,7 +761,7 @@ mod test {
 
             match &program.statements[0] {
                 Statement::ExpressStatement(expression) => match &expression {
-                    Expression::FunctionLiteral(_, params, _) => {
+                    Expression::FunctionLiteral(_, params, _, _) => {
                         assert_eq!(params.len(), expected[i].len());
                         for (j, param) in params.iter().enumerate() {
                             assert_eq!(param.token_literal(), expected[i][j])
@@ -892,6 +897,24 @@ mod test {
                 _ => panic!("expected hash literal"),
             },
             _ => panic!("expected expression statement"),
+        }
+    }
+
+    fn test_function_literal_with_name() {
+        let input = "let myFunction = fn() { };";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::LetStatement(statement) => match &statement.value {
+                Expression::FunctionLiteral(_, _, _, name) => {
+                    assert_eq!(name.borrow().clone().unwrap(), "myFunction");
+                }
+                _ => panic!("expected function literal"),
+            },
+            _ => panic!("expected let statement"),
         }
     }
 

@@ -46,6 +46,7 @@ pub enum Op {
     ReturnValue,
 
     Closure,
+    CurrentClosure,
 }
 
 impl Into<u8> for Op {
@@ -93,6 +94,7 @@ impl Display for Op {
             Self::GetBuiltin => write!(f, "OpGetBuiltin"),
             Self::Closure => write!(f, "OpClosure"),
             Self::GetFree => write!(f, "OpGetFree"),
+            Self::CurrentClosure => write!(f, "OpCurrentClosure"),
         }
     }
 }
@@ -115,6 +117,7 @@ impl Op {
             | Self::Index
             | Self::ReturnValue
             | Self::Return
+            | Self::CurrentClosure
             | Self::Null => vec![],
 
             Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin | Self::GetFree => {

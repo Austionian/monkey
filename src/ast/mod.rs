@@ -1,9 +1,11 @@
 use crate::token::Token;
 use core::panic;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
+    rc::Rc,
 };
 
 pub trait TokenLiteral {
@@ -35,7 +37,12 @@ pub enum Expression {
         Option<Box<BlockStatement>>,
     ),
     // Token, idents, body
-    FunctionLiteral(Token, Vec<Token>, BlockStatement),
+    FunctionLiteral(
+        Token,
+        Vec<Token>,
+        BlockStatement,
+        Rc<RefCell<Option<String>>>,
+    ),
     // Token ie function, arguments
     CallExpression(Box<Expression>, Vec<Expression>),
     ArrayExpression(Vec<Expression>),
@@ -163,10 +170,12 @@ impl Display for Expression {
                     buffer.push_str(&format!("else {}", alt.to_string()));
                 }
             }
-            Self::FunctionLiteral(t, params, body) => {
+            Self::FunctionLiteral(t, params, body, name) => {
+                let name = name.borrow().clone().unwrap_or("".into());
                 buffer.push_str(&format!(
-                    "{} ({}) ",
+                    "{} {} ({}) ",
                     t.token_literal(),
+                    name,
                     params
                         .iter()
                         .map(|p| p.token_literal())

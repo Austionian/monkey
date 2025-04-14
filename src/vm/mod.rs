@@ -172,22 +172,40 @@ impl<'a> VM<'a> {
                 }
                 Op::Closure => {
                     let const_index = code::read_u16(&instructions[ip + 1..]);
-                    let _ = code::read_u8(&instructions[ip + 3..]);
+                    let num_free = code::read_u8(&instructions[ip + 3..]);
                     self.current_frame().ip += 3;
 
-                    self.push_closure(const_index as usize)?;
+                    self.push_closure(const_index as usize, num_free as usize)?;
                 }
-                Op::GetFree => todo!(),
+                Op::GetFree => {
+                    let free_index = code::read_u8(&instructions[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let current_closure = self.current_frame().cl.clone();
+                    if let ObjectType::Closure(_, free) = current_closure {
+                        self.push(free[free_index as usize].clone())?;
+                    }
+                }
+                Op::CurrentClosure => {
+                    let current_closure = self.current_frame().cl.clone();
+                    self.push(current_closure)?;
+                }
             }
         }
 
         Ok(())
     }
 
-    fn push_closure(&mut self, const_index: usize) -> anyhow::Result<()> {
+    fn push_closure(&mut self, const_index: usize, num_free: usize) -> anyhow::Result<()> {
         let constant = &self.constants[const_index];
         if let ObjectType::CompileFunction(_, _, _) = constant {
-            self.push(ObjectType::Closure(Box::new(constant.clone()), vec![]))
+            let mut free = vec![NULL; num_free];
+            for i in 0..num_free {
+                free[i] = self.stack[self.sp - num_free + i].clone();
+            }
+            self.sp -= num_free;
+
+            self.push(ObjectType::Closure(Box::new(constant.clone()), free))
         } else {
             bail!("not a function: {:?}", constant)
         }
@@ -1025,6 +1043,135 @@ mod test {
             vm_test_case!(
                 "push(1, 1)",
                 ObjectType::ErrorObj("argument to `push` must be ARRAY, got INTEGER".into())
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_closures() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let newClosure = fn(a) {
+                        fn() { a };
+                    };
+                    let closure = newClosure(99);
+                    closure();
+                "#,
+                99.0
+            ),
+            vm_test_case!(
+                r#"
+                    let newAdder = fn(a, b) {
+                        fn(c) { a + b + c };
+                    };
+                    let adder = newAdder(1,2);
+                    adder(8);
+                "#,
+                11.0
+            ),
+            vm_test_case!(
+                r#"
+                    let newAdder = fn(a, b) {
+                        let c = a + b;
+                        fn(d) { c + d };
+                    };
+                    let adder = newAdder(1, 2);
+                    adder(8);
+                "#,
+                11.0
+            ),
+            vm_test_case!(
+                r#"
+                    let newAdderOuter = fn(a, b) {
+                        let c = a + b;
+                        fn(d) {
+                            let e = d + c;
+                            fn(f) { e + f; };
+                        };
+                    };
+                    let newAdderInner = newAdderOuter(1, 2)
+                    let adder = newAdderInner(3);
+                    adder(8);
+                "#,
+                14.0
+            ),
+            vm_test_case!(
+                r#"
+                    let a = 1;
+                    let newAdderOuter = fn(b) {
+                        fn(c) {
+                            fn(d) { a + b + c + d };
+                        };
+                    };
+                    let newAdderInner = newAdderOuter(2)
+                    let adder = newAdderInner(3);
+                    adder(8);
+            "#,
+                14.0
+            ),
+            vm_test_case!(
+                r#"
+                    let newClosure = fn(a, b) {
+                        let one = fn() { a; };
+                        let two = fn() { b; };
+                        fn() { one() + two(); };
+                    };
+                    let closure = newClosure(9, 90);
+                    closure();
+                "#,
+                99.0
+            ),
+        ]);
+    }
+
+    #[test]
+    fn test_recursive_functions() {
+        run_vm_tests(vec![
+            vm_test_case!(
+                r#"
+                    let countDown = fn(x) {
+                        if (x == 0) {
+                            return 0;
+                        } else {
+                            countDown(x - 1);
+                        }
+                    };
+                    countDown(1);
+                "#,
+                0.0
+            ),
+            vm_test_case!(
+                r#"
+                    let countDown = fn(x) {
+                        if (x == 0) {
+                            return 0;
+                        } else {
+                            countDown(x - 1);
+                        }
+                    };
+                    let wrapper = fn() {
+                        countDown(1);
+                    };
+                    wrapper();
+                "#,
+                0.0
+            ),
+            vm_test_case!(
+                r#"
+                    let wrapper = fn() {
+                        let countDown = fn(x) {
+                            if (x == 0) {
+                                return 0;
+                            } else {
+                                countDown(x - 1);
+                            }
+                        };
+                        countDown(1);
+                    };
+                    wrapper();
+                "#,
+                0.0
             ),
         ]);
     }

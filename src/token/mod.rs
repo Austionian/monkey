@@ -2,8 +2,7 @@ use crate::{
     ast::{Expression, Map, TokenLiteral},
     parser::{ExpressionPrecendence, Parser},
 };
-use std::fmt::Display;
-use std::{cell::LazyCell, collections::HashMap};
+use std::{cell::LazyCell, cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Debug, Clone, Default, Hash, Eq)]
@@ -99,7 +98,12 @@ fn parse_function_literal(p: &mut Parser) -> Option<Expression> {
 
     let body = p.parse_block_statement().ok()?;
 
-    Some(Expression::FunctionLiteral(token, parameters, body))
+    Some(Expression::FunctionLiteral(
+        token,
+        parameters,
+        body,
+        Rc::new(RefCell::new(None)),
+    ))
 }
 
 fn parse_if_expression(p: &mut Parser) -> Option<Expression> {

@@ -7,7 +7,9 @@ use crate::{
     object::{self, ObjectType},
     token::Token,
 };
-use symbol_table::{Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE};
+use symbol_table::{
+    Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE,
+};
 use thiserror::Error;
 
 pub struct Compiler<'a> {
@@ -156,11 +158,15 @@ impl Compile for Expression {
                     .resolve(name)
                     .ok_or(CompilerError::UndefinedVariable)?;
 
+                // why does moving
+                // `compiler.load_symbol(symbol);`
+                // here break the tests?
                 match symbol.scope {
                     GLOBAL_SCOPE => compiler.emit(&Op::GetGlobal, vec![symbol.index]),
                     LOCAL_SCOPE => compiler.emit(&Op::GetLocal, vec![symbol.index]),
                     BUILTIN_SCOPE => compiler.emit(&Op::GetBuiltin, vec![symbol.index]),
                     FREE_SCOPE => compiler.emit(&Op::GetFree, vec![symbol.index]),
+                    FUNCTION_SCOPE => compiler.emit(&Op::CurrentClosure, vec![]),
                     _ => unreachable!("there should only be four scopes!"),
                 };
             }
@@ -207,8 +213,14 @@ impl Compile for Expression {
                 index.compile(compiler)?;
                 compiler.emit(&Op::Index, vec![]);
             }
-            Self::FunctionLiteral(_, params, block) => {
+            Self::FunctionLiteral(_, params, block, name) => {
                 compiler.enter_scope();
+
+                if name.borrow().is_some() {
+                    compiler
+                        .symbol_table
+                        .define_function_name(name.borrow().clone().unwrap());
+                }
 
                 for param in params {
                     compiler.symbol_table.define(param.token_literal());
@@ -279,8 +291,6 @@ impl Compile for ReturnStatement {
 
 impl Compile for LetStatement {
     fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError> {
-        self.value.compile(compiler)?;
-
         let name = if let Token::IDENT(name) = &self.name {
             name
         } else {
@@ -288,6 +298,8 @@ impl Compile for LetStatement {
         };
 
         let symbol = compiler.symbol_table.define(name.to_string());
+
+        self.value.compile(compiler)?;
 
         if symbol.scope == GLOBAL_SCOPE {
             compiler.emit(&Op::SetGlobal, vec![symbol.index]);
@@ -448,11 +460,13 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn load_symbol(&mut self, symbol: &Symbol) {
+        println!("{symbol:?}");
         match symbol.scope {
             GLOBAL_SCOPE => self.emit(&Op::GetGlobal, vec![symbol.index]),
             LOCAL_SCOPE => self.emit(&Op::GetLocal, vec![symbol.index]),
             BUILTIN_SCOPE => self.emit(&Op::GetBuiltin, vec![symbol.index]),
             FREE_SCOPE => self.emit(&Op::GetFree, vec![symbol.index]),
+            FUNCTION_SCOPE => self.emit(&Op::CurrentClosure, vec![]),
             _ => unreachable!("there should only be four scopes!"),
         };
     }
@@ -1347,5 +1361,35 @@ mod test {
                 )
             ),
         ])
+    }
+
+    #[test]
+    fn test_recursive_closures() {
+        run_compiler_tests(vec![compiler_test_case!(
+            r#"
+                let countDown = fn(x) { countDown(x - 1); };
+                countDown(1);
+                "#,
+            vec![
+                make::it!(&Op::Closure, vec![1, 0]),
+                make::it!(&Op::SetGlobal, vec![0]),
+                make::it!(&Op::GetGlobal, vec![0]),
+                make::it!(&Op::Constant, vec![2]),
+                make::it!(&Op::Call, vec![1]),
+                make::it!(&Op::Pop),
+            ],
+            (
+                1.0,
+                vec![
+                    make::it!(&Op::CurrentClosure),
+                    make::it!(&Op::GetLocal, vec![0]),
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::Sub),
+                    make::it!(&Op::Call, vec![1]),
+                    make::it!(&Op::ReturnValue)
+                ],
+                1.0
+            )
+        )]);
     }
 }
