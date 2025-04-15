@@ -19,7 +19,7 @@ pub fn eval_statements(statements: &Vec<Statement>, env: &mut Environment) -> Ob
     let mut result = ObjectType::default();
 
     for statement in statements {
-        result = eval(&statement, env);
+        result = eval(statement, env);
 
         if let ObjectType::ReturnValueObj(value) = result {
             return *value;
@@ -36,10 +36,7 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
     match node {
         Statement::ExpressStatement(expression) => eval_expression(expression, env),
         Statement::ReturnStatement(return_statement) => {
-            let value = eval(
-                &Statement::ExpressStatement(return_statement.value.clone()),
-                env,
-            );
+            let value = eval_expression(&return_statement.value, env);
 
             if is_error(&value) {
                 return value;
@@ -48,10 +45,7 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
             ObjectType::ReturnValueObj(Box::new(value))
         }
         Statement::LetStatement(let_statement) => {
-            let value = eval(
-                &Statement::ExpressStatement(let_statement.value.clone()),
-                env,
-            );
+            let value = eval_expression(&let_statement.value, env);
 
             if is_error(&value) {
                 return value;
@@ -65,15 +59,8 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
 
 fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType {
     match expression {
-        Expression::IntExpression(int) => match int {
-            Token::INT(v) => ObjectType::IntegerObj(*v as f64),
-            _ => unreachable!("Only ints belong in int expressions"),
-        },
-        Expression::BoolExpression(bool) => match bool {
-            Token::TRUE => TRUE,
-            Token::FALSE => FALSE,
-            _ => unreachable!("Only bools belong in bool expressions"),
-        },
+        Expression::IntExpression(int) => int.to_owned().into(),
+        Expression::BoolExpression(bool) => bool.to_owned().into(),
         Expression::PrefixExpression((t, expression_statement)) => {
             let right = eval_expression(expression_statement, env);
 
@@ -81,7 +68,7 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
                 return right;
             }
 
-            eval_prefix_expression(&t, right)
+            eval_prefix_expression(t, right)
         }
         Expression::InfixExpression((t, left, right)) => {
             let left = eval_expression(left, env);
@@ -97,10 +84,10 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
             eval_infix_statement(t, &left, &right)
         }
         Expression::IfExpression(condition, consequence, alt) => {
-            eval_if_expression(&condition, &consequence, &alt, env)
+            eval_if_expression(condition, consequence, alt, env)
         }
-        Expression::IdentExpression(ident) => eval_ident(&ident, env),
-        Expression::FunctionLiteral(_, parameters, body) => ObjectType::FunctionObj(Function {
+        Expression::IdentExpression(ident) => eval_ident(ident, env),
+        Expression::FunctionLiteral(_, parameters, body, _) => ObjectType::FunctionObj(Function {
             parameters: parameters.to_vec(),
             body: body.clone(),
             // TODO: don't clone the env
@@ -148,14 +135,14 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
 fn eval_hash_literal_node(map: &Map, env: &mut Environment) -> ObjectType {
     let mut pairs = HashMap::new();
     for (k, v) in map.pairs.iter() {
-        let key = eval_expression(&k, env);
+        let key = eval_expression(k, env);
         if is_error(&key) {
             return key;
         }
 
         match key.hash() {
             Ok(hash_key) => {
-                let value = eval_expression(&v, env);
+                let value = eval_expression(v, env);
                 if is_error(&value) {
                     return value;
                 }
@@ -284,14 +271,11 @@ fn eval_block_statements(block: &BlockStatement, env: &mut Environment) -> Objec
     let mut result = ObjectType::default();
 
     for statement in block.statements.iter() {
-        result = eval(&statement, env);
+        result = eval(statement, env);
 
         let result_type = std::mem::discriminant(&result);
         if result != NULL
-            && result_type
-                == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::new(
-                    ObjectType::default(),
-                )))
+            && result_type == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::default()))
             || result_type == std::mem::discriminant(&ObjectType::ErrorObj(String::default()))
         {
             return result;
@@ -314,9 +298,9 @@ fn eval_if_expression(
     }
 
     if is_truthy(c) {
-        return eval_block_statements(&consequence, env);
+        eval_block_statements(consequence, env)
     } else if let Some(a) = alt {
-        return eval_block_statements(&a, env);
+        return eval_block_statements(a, env);
     } else {
         NULL
     }
@@ -352,8 +336,8 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
     }
 
     match token {
-        Token::EQ => native_bool_to_bool_obj(left == right),
-        Token::NOT_EQ => native_bool_to_bool_obj(left != right),
+        Token::Eq => native_bool_to_bool_obj(left == right),
+        Token::Not_eq => native_bool_to_bool_obj(left != right),
         _ => new_error(&format!(
             "unknown operator: {} {} {}",
             left.r#type(),
@@ -365,31 +349,31 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
 
 fn eval_string_infix_statement(operator: &Token, left: &str, right: &str) -> ObjectType {
     match operator {
-        Token::PLUS => ObjectType::StringObj(format!("{left}{right}")),
-        Token::EQ => ObjectType::BoolObj(left == right),
-        Token::NOT_EQ => ObjectType::BoolObj(left != right),
+        Token::Plus => ObjectType::StringObj(format!("{left}{right}")),
+        Token::Eq => ObjectType::BoolObj(left == right),
+        Token::Not_eq => ObjectType::BoolObj(left != right),
         _ => new_error(&format!("unknown operator: STRING {} STRING", operator)),
     }
 }
 
 fn eval_integer_infix_statement(operator: &Token, left: &f64, right: &f64) -> ObjectType {
     match operator {
-        Token::PLUS => ObjectType::IntegerObj(left + right),
-        Token::MINUS => ObjectType::IntegerObj(left - right),
-        Token::ASTERISK => ObjectType::IntegerObj(left * right),
-        Token::SLASH => ObjectType::IntegerObj(left / right),
-        Token::LT => native_bool_to_bool_obj(left < right),
-        Token::GT => native_bool_to_bool_obj(left > right),
-        Token::EQ => native_bool_to_bool_obj(left == right),
-        Token::NOT_EQ => native_bool_to_bool_obj(left != right),
+        Token::Plus => ObjectType::IntegerObj(left + right),
+        Token::Minus => ObjectType::IntegerObj(left - right),
+        Token::Asterisk => ObjectType::IntegerObj(left * right),
+        Token::Slash => ObjectType::IntegerObj(left / right),
+        Token::Lt => native_bool_to_bool_obj(left < right),
+        Token::Gt => native_bool_to_bool_obj(left > right),
+        Token::Eq => native_bool_to_bool_obj(left == right),
+        Token::Not_eq => native_bool_to_bool_obj(left != right),
         _ => new_error(&format!("unknown operator: INTEGER {} INTEGER", operator)),
     }
 }
 
 fn eval_prefix_expression(operator: &Token, right: ObjectType) -> ObjectType {
     match operator {
-        Token::BANG => eval_bang_operator(right),
-        Token::MINUS => eval_minus_prefix(right),
+        Token::Bang => eval_bang_operator(right),
+        Token::Minus => eval_minus_prefix(right),
         _ => new_error(&format!("unknown operator: {}{}", operator, right.r#type())),
     }
 }
@@ -422,10 +406,8 @@ mod test {
     use super::*;
     use crate::lexer::Lexer;
     use crate::object::ObjectType;
-    use crate::parser::check_parse_errors;
     use crate::{object::Object, parser::Parser, test_setup};
     use core::panic;
-    use std::fmt::write;
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);

@@ -1,7 +1,9 @@
+mod builtins;
 use crate::{
     ast::{BlockStatement, TokenLiteral},
     token::Token,
 };
+pub use builtins::{get_builtin_by_name, BUILTINS};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -12,7 +14,7 @@ pub trait Object {
     fn inspect(&self) -> String;
 }
 
-type BuiltIns = fn(Vec<ObjectType>) -> ObjectType;
+pub type BuiltinFn = fn(Vec<ObjectType>) -> ObjectType;
 
 #[derive(Clone, PartialEq, Default, Debug)]
 pub enum ObjectType {
@@ -24,9 +26,13 @@ pub enum ObjectType {
     ErrorObj(String),
     FunctionObj(Function),
     StringObj(String),
-    BuiltinFunction(BuiltIns),
+    BuiltinFunction(BuiltinFn),
     ArrayObj(Vec<ObjectType>),
     HashObj(MapObj),
+    // functions bytecode instructions, the number of local variables, the number of params
+    CompileFunction(Vec<u8>, usize, usize),
+    // compiled function, free variables
+    Closure(Box<Self>, Vec<ObjectType>),
 }
 
 impl ObjectType {
@@ -36,6 +42,18 @@ impl ObjectType {
             ObjectType::StringObj(ref string) => Ok(string.chars().map(|c| c as u64).sum()),
             ObjectType::IntegerObj(int) => Ok(*int as u64),
             _ => Err(format!("unusable as a hash key: {}", self.r#type())),
+        }
+    }
+}
+
+impl From<Token> for ObjectType {
+    fn from(value: Token) -> Self {
+        match value {
+            Token::Int(t) => Self::IntegerObj(t as f64),
+            Token::False => Self::BoolObj(false),
+            Token::True => Self::BoolObj(true),
+            Token::String(s) => Self::StringObj(s),
+            _ => todo!(),
         }
     }
 }
@@ -71,10 +89,16 @@ impl Object for ObjectType {
             Self::HashObj(h) => format!(
                 "{{{}}}",
                 h.iter()
-                    .map(|(_, v)| format!("{}: {}", v.key.to_string(), v.value.to_string()))
+                    .map(|(_, v)| format!("{}: {}", v.key, v.value))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Self::CompileFunction(f, _, _) => {
+                format!("{f:?}")
+            }
+            Self::Closure(f, _) => {
+                format!("{f:?}")
+            }
         }
     }
 }
@@ -92,6 +116,8 @@ impl Display for ObjectType {
             Self::BuiltinFunction(_) => write!(f, "BUILTIN"),
             Self::ArrayObj(_) => write!(f, "ARRAY"),
             Self::HashObj(_) => write!(f, "HASH"),
+            Self::CompileFunction(_, _, _) => write!(f, "COMPILED FUNCTION"),
+            Self::Closure(_, _) => write!(f, "CLOSURE"),
         }
     }
 }

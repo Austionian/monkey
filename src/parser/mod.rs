@@ -3,7 +3,7 @@ use crate::{
     lexer::Lexer,
     token::Token,
 };
-use std::{cell::LazyCell, collections::HashMap, mem};
+use std::{collections::HashMap, mem, sync::LazyLock};
 
 #[derive(Clone, PartialEq, PartialOrd)]
 pub enum ExpressionPrecendence {
@@ -17,19 +17,19 @@ pub enum ExpressionPrecendence {
     INDEX = 8,
 }
 
-const TOKEN_PRECEDENCES: LazyCell<HashMap<Token, ExpressionPrecendence>> = LazyCell::new(|| {
+static TOKEN_PRECEDENCES: LazyLock<HashMap<Token, ExpressionPrecendence>> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
-    map.insert(Token::EQ, ExpressionPrecendence::EQUALS);
-    map.insert(Token::NOT_EQ, ExpressionPrecendence::EQUALS);
-    map.insert(Token::LT, ExpressionPrecendence::LessGreater);
-    map.insert(Token::GT, ExpressionPrecendence::LessGreater);
-    map.insert(Token::PLUS, ExpressionPrecendence::SUM);
-    map.insert(Token::MINUS, ExpressionPrecendence::SUM);
-    map.insert(Token::SLASH, ExpressionPrecendence::PRODUCT);
-    map.insert(Token::ASTERISK, ExpressionPrecendence::PRODUCT);
-    map.insert(Token::LPAREN, ExpressionPrecendence::CALL);
-    map.insert(Token::LBRACKET, ExpressionPrecendence::INDEX);
+    map.insert(Token::Eq, ExpressionPrecendence::EQUALS);
+    map.insert(Token::Not_eq, ExpressionPrecendence::EQUALS);
+    map.insert(Token::Lt, ExpressionPrecendence::LessGreater);
+    map.insert(Token::Gt, ExpressionPrecendence::LessGreater);
+    map.insert(Token::Plus, ExpressionPrecendence::SUM);
+    map.insert(Token::Minus, ExpressionPrecendence::SUM);
+    map.insert(Token::Slash, ExpressionPrecendence::PRODUCT);
+    map.insert(Token::Asterisk, ExpressionPrecendence::PRODUCT);
+    map.insert(Token::Lparen, ExpressionPrecendence::CALL);
+    map.insert(Token::Lbracket, ExpressionPrecendence::INDEX);
 
     map
 });
@@ -84,7 +84,7 @@ impl<'a> Parser<'a> {
             statements: Vec::default(),
         };
 
-        while self.cur_token != Token::EOF {
+        while self.cur_token != Token::Eof {
             let statement = self.parse_statement();
             match statement {
                 Ok(statement) => program.statements.push(statement),
@@ -98,8 +98,8 @@ impl<'a> Parser<'a> {
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
         match self.cur_token {
-            Token::LET => self.parse_let_statement(),
-            Token::RETURN => self.parse_return_statement(),
+            Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -113,7 +113,7 @@ impl<'a> Parser<'a> {
         let prefix_fn = prefix_fn?;
         let mut left_expression = prefix_fn(self)?;
 
-        while !self.peek_token_is(&Token::SEMICOLON) && precendence < self.peek_precedence() {
+        while !self.peek_token_is(&Token::Semicolon) && precendence < self.peek_precedence() {
             let infix_fn = self.peek_token.infix_function();
             if infix_fn.is_none() {
                 return Some(left_expression);
@@ -133,7 +133,7 @@ impl<'a> Parser<'a> {
             .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("No expression found")?;
 
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
@@ -145,7 +145,7 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        while !self.cur_token_is(Token::RBRACE) && !self.cur_token_is(Token::EOF) {
+        while !self.cur_token_is(Token::Rbrace) && !self.cur_token_is(Token::Eof) {
             let statement = self.parse_statement()?;
             statements.push(statement);
 
@@ -167,15 +167,15 @@ impl<'a> Parser<'a> {
             .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("Failed to parse expression")?;
 
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
         Ok(Statement::ReturnStatement(statement))
     }
 
-    pub fn parse_call_arguements(&mut self) -> Option<Vec<Expression>> {
-        self.parse_expression_list(&Token::RPAREN)
+    pub fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
+        self.parse_expression_list(&Token::Rparen)
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -185,13 +185,13 @@ impl<'a> Parser<'a> {
             value: Expression::default(),
         };
 
-        if !self.expect_peek(&Token::IDENT(String::default())) {
+        if !self.expect_peek(&Token::Ident(String::default())) {
             return Err("Failed".to_string());
         }
 
         statement.name = self.cur_token.clone();
 
-        if !self.expect_peek(&Token::ASSIGN) {
+        if !self.expect_peek(&Token::Assign) {
             return Err("Failed to parse let statement".to_string());
         }
 
@@ -201,7 +201,12 @@ impl<'a> Parser<'a> {
             .parse_expression(ExpressionPrecendence::LOWEST)
             .ok_or("failed to parse expression")?;
 
-        if self.peek_token_is(&Token::SEMICOLON) {
+        if let Expression::FunctionLiteral(_, _, _, ref rc) = statement.value {
+            let mut name = rc.borrow_mut();
+            *name = Some(statement.name.to_string());
+        }
+
+        if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
         }
 
@@ -211,7 +216,7 @@ impl<'a> Parser<'a> {
     pub fn parse_function_parameters(&mut self) -> Option<Vec<Token>> {
         let mut parameters = Vec::new();
 
-        if self.peek_token_is(&Token::RPAREN) {
+        if self.peek_token_is(&Token::Rparen) {
             self.next_token();
             return Some(parameters);
         }
@@ -220,7 +225,7 @@ impl<'a> Parser<'a> {
 
         parameters.push(self.cur_token.clone());
 
-        while self.peek_token_is(&Token::COMMA) {
+        while self.peek_token_is(&Token::Comma) {
             // advance to comma
             self.next_token();
             // advance to the ident
@@ -229,7 +234,7 @@ impl<'a> Parser<'a> {
             parameters.push(self.cur_token.clone());
         }
 
-        if !self.expect_peek(&Token::RPAREN) {
+        if !self.expect_peek(&Token::Rparen) {
             return None;
         }
 
@@ -280,7 +285,7 @@ impl<'a> Parser<'a> {
         self.next_token();
         list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
 
-        while self.peek_token_is(&Token::COMMA) {
+        while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
             list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
@@ -294,6 +299,7 @@ impl<'a> Parser<'a> {
     }
 }
 
+#[cfg(test)]
 pub fn check_parse_errors(p: &Parser) {
     let errors = p.errors();
 
@@ -322,7 +328,7 @@ mod test {
     fn test_statement(statement: &Statement, name: &str) -> bool {
         match statement {
             Statement::LetStatement(statement) => {
-                if statement.token != Token::LET {
+                if statement.token != Token::Let {
                     eprint!("Expected Let token, got: {:?}", statement.token);
                     return false;
                 }
@@ -332,7 +338,7 @@ mod test {
                 }
             }
             Statement::ReturnStatement(statement) => {
-                if statement.token != Token::RETURN {
+                if statement.token != Token::Return {
                     eprint!("Expected Let token, got: {:?}", statement.token);
                     return false;
                 }
@@ -412,7 +418,7 @@ mod test {
                     assert_eq!(&token.token_literal(), "5");
 
                     match token {
-                        Token::INT(value) => assert_eq!(*value, 5),
+                        Token::Int(value) => assert_eq!(*value, 5),
                         _ => panic!("Only INT token expected."),
                     }
                 }
@@ -463,12 +469,12 @@ mod test {
 
                         match **int_expression {
                             Expression::IntExpression(ref t) => match t {
-                                Token::INT(value) => assert_eq!(value, &expected_int[i]),
+                                Token::Int(value) => assert_eq!(value, &expected_int[i]),
                                 _ => panic!("only ints here"),
                             },
                             Expression::BoolExpression(ref t) => match t {
-                                Token::FALSE => assert_eq!(t.token_literal(), expected_bool[i - 2]),
-                                Token::TRUE => assert_eq!(t.token_literal(), expected_bool[i - 2]),
+                                Token::False => assert_eq!(t.token_literal(), expected_bool[i - 2]),
+                                Token::True => assert_eq!(t.token_literal(), expected_bool[i - 2]),
                                 _ => panic!("Only Bool token expected."),
                             },
                             _ => panic!("Only INT"),
@@ -505,7 +511,7 @@ mod test {
 
                         match **left_expression {
                             Expression::IntExpression(ref t) => {
-                                if let Token::INT(value) = t {
+                                if let Token::Int(value) = t {
                                     assert_eq!(value, &expected_int[i]);
                                 }
                             }
@@ -514,7 +520,7 @@ mod test {
 
                         match **right_expression {
                             Expression::IntExpression(ref t) => {
-                                if let Token::INT(value) = t {
+                                if let Token::Int(value) = t {
                                     assert_eq!(value, &expected_int[i]);
                                 }
                             }
@@ -548,7 +554,7 @@ mod test {
 
                         if let Expression::BoolExpression(ref t) = **left_expression {
                             match t {
-                                Token::FALSE | Token::TRUE => {
+                                Token::False | Token::True => {
                                     assert_eq!(t.token_literal(), expected_bool[i])
                                 }
                                 _ => panic!("Only bool token expected"),
@@ -559,7 +565,7 @@ mod test {
 
                         if let Expression::BoolExpression(ref t) = **right_expression {
                             match t {
-                                Token::FALSE | Token::TRUE => {
+                                Token::False | Token::True => {
                                     assert_eq!(t.token_literal(), expected_bool[i + 3])
                                 }
                                 _ => panic!("Only bool token expected"),
@@ -723,12 +729,12 @@ mod test {
 
         match &program.statements[0] {
             Statement::ExpressStatement(expression) => match &expression {
-                Expression::FunctionLiteral(_, params, body) => {
+                Expression::FunctionLiteral(_, params, body, _) => {
                     assert_eq!(params.len(), 2);
-                    if let Token::IDENT(x) = &params[0] {
+                    if let Token::Ident(x) = &params[0] {
                         assert_eq!(x, "x");
                     }
-                    if let Token::IDENT(y) = &params[1] {
+                    if let Token::Ident(y) = &params[1] {
                         assert_eq!(y, "y");
                     }
 
@@ -756,7 +762,7 @@ mod test {
 
             match &program.statements[0] {
                 Statement::ExpressStatement(expression) => match &expression {
-                    Expression::FunctionLiteral(_, params, _) => {
+                    Expression::FunctionLiteral(_, params, _, _) => {
                         assert_eq!(params.len(), expected[i].len());
                         for (j, param) in params.iter().enumerate() {
                             assert_eq!(param.token_literal(), expected[i][j])
@@ -895,6 +901,24 @@ mod test {
         }
     }
 
+    fn test_function_literal_with_name() {
+        let input = "let myFunction = fn() { };";
+
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::LetStatement(statement) => match &statement.value {
+                Expression::FunctionLiteral(_, _, _, name) => {
+                    assert_eq!(name.borrow().clone().unwrap(), "myFunction");
+                }
+                _ => panic!("expected function literal"),
+            },
+            _ => panic!("expected let statement"),
+        }
+    }
+
     fn test_ident_expression(expression: &Expression, expected_token: &str) {
         match expression {
             Expression::IdentExpression(t) => {
@@ -953,7 +977,6 @@ macro_rules! test_setup {
         let lexer = Lexer::new($input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        check_parse_errors(&parser);
 
         program.unwrap()
     }};

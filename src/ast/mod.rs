@@ -1,9 +1,11 @@
 use crate::token::Token;
 use core::panic;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
+    rc::Rc,
 };
 
 pub trait TokenLiteral {
@@ -35,7 +37,12 @@ pub enum Expression {
         Option<Box<BlockStatement>>,
     ),
     // Token, idents, body
-    FunctionLiteral(Token, Vec<Token>, BlockStatement),
+    FunctionLiteral(
+        Token,
+        Vec<Token>,
+        BlockStatement,
+        Rc<RefCell<Option<String>>>,
+    ),
     // Token ie function, arguments
     CallExpression(Box<Expression>, Vec<Expression>),
     ArrayExpression(Vec<Expression>),
@@ -63,11 +70,11 @@ impl Hash for Expression {
 }
 
 impl PartialEq for Map {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         todo!()
     }
 
-    fn ne(&self, other: &Self) -> bool {
+    fn ne(&self, _: &Self) -> bool {
         todo!()
     }
 }
@@ -160,13 +167,15 @@ impl Display for Expression {
                 buffer.push_str(&format!("if {} {}", condition, consequnce));
 
                 if let Some(alt) = alternative {
-                    buffer.push_str(&format!("else {}", alt.to_string()));
+                    buffer.push_str(&format!("else {}", alt));
                 }
             }
-            Self::FunctionLiteral(t, params, body) => {
+            Self::FunctionLiteral(t, params, body, name) => {
+                let name = name.borrow().clone().unwrap_or("".into());
                 buffer.push_str(&format!(
-                    "{} ({}) ",
+                    "{} {} ({}) ",
                     t.token_literal(),
+                    name,
                     params
                         .iter()
                         .map(|p| p.token_literal())
@@ -248,8 +257,8 @@ mod test {
         program
             .statements
             .push(Statement::LetStatement(LetStatement {
-                token: Token::LET,
-                name: Token::IDENT("test".to_string()),
+                token: Token::Let,
+                name: Token::Ident("test".to_string()),
                 value: Expression::default(),
             }));
 
@@ -263,9 +272,9 @@ mod test {
         program
             .statements
             .push(Statement::LetStatement(LetStatement {
-                token: Token::LET,
-                name: Token::IDENT("myVar".to_string()),
-                value: Expression::IdentExpression(Token::IDENT("anotherVar".to_string())),
+                token: Token::Let,
+                name: Token::Ident("myVar".to_string()),
+                value: Expression::IdentExpression(Token::Ident("anotherVar".to_string())),
             }));
 
         assert_eq!(program.to_string(), "let myVar = anotherVar;");
@@ -277,10 +286,10 @@ mod test {
         program
             .statements
             .push(Statement::ExpressStatement(Expression::PrefixExpression((
-                Token::BANG,
+                Token::Bang,
                 Box::new(Expression::PrefixExpression((
-                    Token::MINUS,
-                    Box::new(Expression::IntExpression(Token::IDENT("a".to_string()))),
+                    Token::Minus,
+                    Box::new(Expression::IntExpression(Token::Ident("a".to_string()))),
                 ))),
             ))));
 
