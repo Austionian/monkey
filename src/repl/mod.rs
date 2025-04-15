@@ -1,3 +1,7 @@
+mod compile;
+mod eval;
+mod eval_file;
+
 use crate::{
     compiler::{symbol_table::SymbolTable, Compiler},
     lexer,
@@ -5,12 +9,29 @@ use crate::{
     parser::Parser,
     vm::{GLOBAL_SIZE, VM},
 };
+pub use compile::compile;
+pub use eval::repl_start;
+pub use eval_file::eval;
 use std::{
     io::{self, Write},
     process::{self},
 };
 
 const PROMPT: &str = ">> ";
+
+pub fn parse_errors(parser: &Parser) -> Result<(), ()> {
+    if !parser.errors.is_empty() {
+        eprintln!("{MONKEY_FACE}");
+        eprintln!("Whoops! We ran into some monkey business here!");
+        eprintln!("parser errors:");
+        for error in parser.errors.iter() {
+            eprintln!("\t{error}");
+        }
+        return Err(());
+    }
+
+    Ok(())
+}
 
 pub fn start<'a>(
     constants: &'a mut Vec<ObjectType>,
@@ -32,26 +53,12 @@ pub fn start<'a>(
 
     let program = parser.parse_program();
 
-    if !parser.errors.is_empty() {
-        eprintln!("{MONKEY_FACE}");
-        eprintln!("Whoops! We ran into some monkey business here!");
-        eprintln!("parser errors:");
-        for error in parser.errors {
-            eprintln!("\t{error}");
+    match parse_errors(&parser) {
+        Ok(_) => {}
+        Err(_) => {
+            return symbol_table;
         }
-        return symbol_table;
-    }
-
-    // evaluated program
-    //if let Ok(program) = program {
-    //    let evaluated = eval_program(&program, env);
-    //    println!("{}", evaluated.inspect());
-    //}
-    //let mut tok = Token::default();
-    //while tok != Token::EOF {
-    //    tok = lexer.next_token();
-    //    println!("out: {:?}", tok);
-    //}
+    };
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);

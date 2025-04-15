@@ -10,7 +10,7 @@ use frame::Frame;
 use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
-pub const GLOBAL_SIZE: usize = 100; // TODO: look into why this can't be 65536
+pub const GLOBAL_SIZE: usize = 1000; // TODO: look into why this can't be 65536
 const FRAME_SIZE: usize = 1024;
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
@@ -200,8 +200,8 @@ impl<'a> VM<'a> {
         let constant = &self.constants[const_index];
         if let ObjectType::CompileFunction(_, _, _) = constant {
             let mut free = vec![NULL; num_free];
-            for i in 0..num_free {
-                free[i] = self.stack[self.sp - num_free + i].clone();
+            for (i, obj) in free.iter_mut().enumerate().take(num_free) {
+                *obj = self.stack[self.sp - num_free + i].clone();
             }
             self.sp -= num_free;
 
@@ -1174,5 +1174,24 @@ mod test {
                 0.0
             ),
         ]);
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        run_vm_tests(vec![vm_test_case!(
+            r#"
+            let fibonacci = fn(x) {
+                if (x == 0) {
+                    return 0;
+                }
+                if (x == 1) {
+                    return 1;
+                }
+                return fibonacci(x - 1) + fibonacci(x - 2);
+            };
+            fibonacci(15);
+        "#,
+            610.0
+        )]);
     }
 }
