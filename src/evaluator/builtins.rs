@@ -1,8 +1,8 @@
 use crate::object::{self, ObjectType};
-use std::{cell::LazyCell, collections::HashMap};
+use std::{collections::HashMap, sync::LazyLock};
 
-pub const BUILTINS: LazyCell<HashMap<&'static str, fn(Vec<ObjectType>) -> ObjectType>> =
-    LazyCell::new(|| {
+pub static BUILTINS: LazyLock<HashMap<&'static str, fn(Vec<ObjectType>) -> ObjectType>> =
+    LazyLock::new(|| {
         let mut builtins = HashMap::new();
 
         builtins.insert("len", object::get_builtin_by_name("len").unwrap());

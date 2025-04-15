@@ -1,10 +1,10 @@
 mod op;
 
 pub use op::Op;
-use std::{
-    io::{Cursor, Seek, Write},
-    mem::transmute,
-};
+use std::io::{Cursor, Seek, Write};
+
+#[cfg(test)]
+use std::mem::transmute;
 
 pub type Instructions = Vec<Opcode>;
 pub type Opcode = u8;
@@ -78,6 +78,7 @@ pub fn read_u8(ins: &[u8]) -> u8 {
     ins[0]
 }
 
+#[cfg(test)]
 pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u32>, usize) {
     let widths = op.lookup_widths();
     let mut operands = vec![];
@@ -96,6 +97,7 @@ pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u32>, usize) {
     (operands, offset)
 }
 
+#[cfg(test)]
 pub fn instruction_to_string(ins: &Instructions) -> String {
     let mut out = String::new();
 
@@ -118,6 +120,7 @@ pub fn instruction_to_string(ins: &Instructions) -> String {
     out
 }
 
+#[cfg(test)]
 fn format_instruction(op: &Op, operands: Vec<u32>) -> Result<String, String> {
     let operand_count = op.lookup_widths().len();
 

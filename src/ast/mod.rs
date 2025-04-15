@@ -70,11 +70,11 @@ impl Hash for Expression {
 }
 
 impl PartialEq for Map {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         todo!()
     }
 
-    fn ne(&self, other: &Self) -> bool {
+    fn ne(&self, _: &Self) -> bool {
         todo!()
     }
 }
@@ -257,8 +257,8 @@ mod test {
         program
             .statements
             .push(Statement::LetStatement(LetStatement {
-                token: Token::LET,
-                name: Token::IDENT("test".to_string()),
+                token: Token::Let,
+                name: Token::Ident("test".to_string()),
                 value: Expression::default(),
             }));
 
@@ -272,9 +272,9 @@ mod test {
         program
             .statements
             .push(Statement::LetStatement(LetStatement {
-                token: Token::LET,
-                name: Token::IDENT("myVar".to_string()),
-                value: Expression::IdentExpression(Token::IDENT("anotherVar".to_string())),
+                token: Token::Let,
+                name: Token::Ident("myVar".to_string()),
+                value: Expression::IdentExpression(Token::Ident("anotherVar".to_string())),
             }));
 
         assert_eq!(program.to_string(), "let myVar = anotherVar;");
@@ -286,10 +286,10 @@ mod test {
         program
             .statements
             .push(Statement::ExpressStatement(Expression::PrefixExpression((
-                Token::BANG,
+                Token::Bang,
                 Box::new(Expression::PrefixExpression((
-                    Token::MINUS,
-                    Box::new(Expression::IntExpression(Token::IDENT("a".to_string()))),
+                    Token::Minus,
+                    Box::new(Expression::IntExpression(Token::Ident("a".to_string()))),
                 ))),
             ))));
 

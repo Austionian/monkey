@@ -82,16 +82,16 @@ impl Compile for Expression {
                 let _ = compiler.emit(&code::Op::Constant, vec![i]);
             }
             Self::BoolExpression(t) => match t {
-                Token::TRUE => {
+                Token::True => {
                     compiler.emit(&Op::True, vec![]);
                 }
-                Token::FALSE => {
+                Token::False => {
                     compiler.emit(&Op::False, vec![]);
                 }
                 _ => unreachable!("Only bools should be in bool expressions"),
             },
             Self::InfixExpression((operator, left, right)) => {
-                if operator == &Token::LT {
+                if operator == &Token::Lt {
                     // Flip the order rather than make an OP_LESS_THAN
                     right.as_ref().compile(compiler)?;
                     left.as_ref().compile(compiler)?;
@@ -103,13 +103,13 @@ impl Compile for Expression {
                 right.as_ref().compile(compiler)?;
 
                 match operator {
-                    Token::PLUS => compiler.emit(&Op::Add, vec![]),
-                    Token::MINUS => compiler.emit(&Op::Sub, vec![]),
-                    Token::SLASH => compiler.emit(&Op::Div, vec![]),
-                    Token::ASTERISK => compiler.emit(&Op::Mul, vec![]),
-                    Token::GT => compiler.emit(&Op::GreaterThan, vec![]),
-                    Token::EQ => compiler.emit(&Op::Equal, vec![]),
-                    Token::NOT_EQ => compiler.emit(&Op::NotEqual, vec![]),
+                    Token::Plus => compiler.emit(&Op::Add, vec![]),
+                    Token::Minus => compiler.emit(&Op::Sub, vec![]),
+                    Token::Slash => compiler.emit(&Op::Div, vec![]),
+                    Token::Asterisk => compiler.emit(&Op::Mul, vec![]),
+                    Token::Gt => compiler.emit(&Op::GreaterThan, vec![]),
+                    Token::Eq => compiler.emit(&Op::Equal, vec![]),
+                    Token::Not_eq => compiler.emit(&Op::NotEqual, vec![]),
                     _ => todo!(),
                 };
             }
@@ -117,8 +117,8 @@ impl Compile for Expression {
                 right.as_ref().compile(compiler)?;
 
                 match operator {
-                    Token::BANG => compiler.emit(&Op::Bang, vec![]),
-                    Token::MINUS => compiler.emit(&Op::Minus, vec![]),
+                    Token::Bang => compiler.emit(&Op::Bang, vec![]),
+                    Token::Minus => compiler.emit(&Op::Minus, vec![]),
                     _ => todo!(),
                 };
             }
@@ -154,7 +154,7 @@ impl Compile for Expression {
                 compiler.change_operand(jump_position, after_alternative_position);
             }
             Self::IdentExpression(ident) => {
-                let name = if let Token::IDENT(name) = ident {
+                let name = if let Token::Ident(name) = ident {
                     name
                 } else {
                     return Err(CompilerError::InvalidToken(ident.clone()));
@@ -297,7 +297,7 @@ impl Compile for ReturnStatement {
 
 impl Compile for LetStatement {
     fn compile(&self, compiler: &mut Compiler) -> Result<(), CompilerError> {
-        let name = if let Token::IDENT(name) = &self.name {
+        let name = if let Token::Ident(name) = &self.name {
             name
         } else {
             return Err(CompilerError::InvalidToken(self.name.clone()));
@@ -491,7 +491,7 @@ mod test {
     use code::Instructions;
     use core::panic;
     use object::ObjectType;
-    use std::{any::Any, fmt::write};
+    use std::any::Any;
 
     struct CompilerTestCase {
         input: &'static str,

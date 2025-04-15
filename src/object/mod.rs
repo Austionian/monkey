@@ -49,10 +49,10 @@ impl ObjectType {
 impl From<Token> for ObjectType {
     fn from(value: Token) -> Self {
         match value {
-            Token::INT(t) => Self::IntegerObj(t as f64),
-            Token::FALSE => Self::BoolObj(false),
-            Token::TRUE => Self::BoolObj(true),
-            Token::STRING(s) => Self::StringObj(s),
+            Token::Int(t) => Self::IntegerObj(t as f64),
+            Token::False => Self::BoolObj(false),
+            Token::True => Self::BoolObj(true),
+            Token::String(s) => Self::StringObj(s),
             _ => todo!(),
         }
     }

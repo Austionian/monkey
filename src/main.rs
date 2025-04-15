@@ -1,9 +1,6 @@
 use clap::Parser;
 use monkey_interpreter::{
-    compiler::symbol_table::SymbolTable,
-    object::Environment,
-    object::{Object, ObjectType},
-    repl,
+    compiler::symbol_table::SymbolTable, object::Environment, object::ObjectType, repl,
     vm::GLOBAL_SIZE,
 };
 use std::path::PathBuf;
