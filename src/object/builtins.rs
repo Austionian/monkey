@@ -99,7 +99,7 @@ fn rest(args: Vec<ObjectType>) -> ObjectType {
     }
 
     if let ObjectType::ArrayObj(array) = &args[0] {
-        if array.len() > 0 {
+        if !array.is_empty() {
             ObjectType::ArrayObj(Vec::from_iter(array[1..].iter().cloned()))
         } else {
             ObjectType::NullObj

@@ -6,8 +6,8 @@ use crate::{
     vm::{GLOBAL_SIZE, VM},
 };
 
-pub fn compile<'a>(
-    constants: &'a mut Vec<ObjectType>,
+pub fn compile(
+    constants: &mut Vec<ObjectType>,
     symbol_table: SymbolTable,
     globals: &mut [ObjectType; GLOBAL_SIZE],
     buffer: &str,
@@ -28,7 +28,7 @@ pub fn compile<'a>(
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);
-        if let Err(_) = comp.compile(program) {
+        if comp.compile(program).is_err() {
             eprintln!("woops! compilation failed");
         }
 

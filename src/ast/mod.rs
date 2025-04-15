@@ -167,7 +167,7 @@ impl Display for Expression {
                 buffer.push_str(&format!("if {} {}", condition, consequnce));
 
                 if let Some(alt) = alternative {
-                    buffer.push_str(&format!("else {}", alt.to_string()));
+                    buffer.push_str(&format!("else {}", alt));
                 }
             }
             Self::FunctionLiteral(t, params, body, name) => {

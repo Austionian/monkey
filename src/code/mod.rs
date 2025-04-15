@@ -93,7 +93,7 @@ pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u32>, usize) {
         offset += width as usize;
     }
 
-    (operands, offset.into())
+    (operands, offset)
 }
 
 pub fn instruction_to_string(ins: &Instructions) -> String {

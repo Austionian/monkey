@@ -19,7 +19,7 @@ pub fn eval_statements(statements: &Vec<Statement>, env: &mut Environment) -> Ob
     let mut result = ObjectType::default();
 
     for statement in statements {
-        result = eval(&statement, env);
+        result = eval(statement, env);
 
         if let ObjectType::ReturnValueObj(value) = result {
             return *value;
@@ -68,7 +68,7 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
                 return right;
             }
 
-            eval_prefix_expression(&t, right)
+            eval_prefix_expression(t, right)
         }
         Expression::InfixExpression((t, left, right)) => {
             let left = eval_expression(left, env);
@@ -84,9 +84,9 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
             eval_infix_statement(t, &left, &right)
         }
         Expression::IfExpression(condition, consequence, alt) => {
-            eval_if_expression(&condition, &consequence, &alt, env)
+            eval_if_expression(condition, consequence, alt, env)
         }
-        Expression::IdentExpression(ident) => eval_ident(&ident, env),
+        Expression::IdentExpression(ident) => eval_ident(ident, env),
         Expression::FunctionLiteral(_, parameters, body, _) => ObjectType::FunctionObj(Function {
             parameters: parameters.to_vec(),
             body: body.clone(),
@@ -135,14 +135,14 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
 fn eval_hash_literal_node(map: &Map, env: &mut Environment) -> ObjectType {
     let mut pairs = HashMap::new();
     for (k, v) in map.pairs.iter() {
-        let key = eval_expression(&k, env);
+        let key = eval_expression(k, env);
         if is_error(&key) {
             return key;
         }
 
         match key.hash() {
             Ok(hash_key) => {
-                let value = eval_expression(&v, env);
+                let value = eval_expression(v, env);
                 if is_error(&value) {
                     return value;
                 }
@@ -271,14 +271,12 @@ fn eval_block_statements(block: &BlockStatement, env: &mut Environment) -> Objec
     let mut result = ObjectType::default();
 
     for statement in block.statements.iter() {
-        result = eval(&statement, env);
+        result = eval(statement, env);
 
         let result_type = std::mem::discriminant(&result);
         if result != NULL
             && result_type
-                == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::new(
-                    ObjectType::default(),
-                )))
+                == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::default()))
             || result_type == std::mem::discriminant(&ObjectType::ErrorObj(String::default()))
         {
             return result;
@@ -301,9 +299,9 @@ fn eval_if_expression(
     }
 
     if is_truthy(c) {
-        return eval_block_statements(&consequence, env);
+        eval_block_statements(consequence, env)
     } else if let Some(a) = alt {
-        return eval_block_statements(&a, env);
+        return eval_block_statements(a, env);
     } else {
         NULL
     }

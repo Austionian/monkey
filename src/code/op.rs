@@ -49,16 +49,16 @@ pub enum Op {
     CurrentClosure,
 }
 
-impl Into<u8> for Op {
-    fn into(self) -> u8 {
-        self as u8
+impl From<Op> for u8 {
+    fn from(val: Op) -> Self {
+        val as u8
     }
 }
 
-impl Into<Op> for u8 {
-    fn into(self) -> Op {
+impl From<u8> for Op {
+    fn from(val: u8) -> Self {
         // SAFETY: an Op should only ever be a u8. This could definitely blow up though.
-        unsafe { transmute(self) }
+        unsafe { transmute(val) }
     }
 }
 

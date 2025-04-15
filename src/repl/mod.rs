@@ -33,8 +33,8 @@ pub fn parse_errors(parser: &Parser) -> Result<(), ()> {
     Ok(())
 }
 
-pub fn start<'a>(
-    constants: &'a mut Vec<ObjectType>,
+pub fn start(
+    constants: &mut Vec<ObjectType>,
     symbol_table: SymbolTable,
     globals: &mut [ObjectType; GLOBAL_SIZE],
 ) -> SymbolTable {
@@ -62,7 +62,7 @@ pub fn start<'a>(
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);
-        if let Err(_) = comp.compile(program) {
+        if comp.compile(program).is_err() {
             eprintln!("woops! compilation failed");
         }
 

@@ -9,7 +9,7 @@ use std::{
     process::{self},
 };
 
-const PROMPT: &'static str = ">> ";
+const PROMPT: &str = ">> ";
 
 pub fn repl_start(env: &mut Environment) {
     print!("{PROMPT}");

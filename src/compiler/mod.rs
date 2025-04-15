@@ -24,6 +24,12 @@ pub struct Environment {
     pub symbol_table: SymbolTable,
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Environment {
     pub fn new() -> Self {
         Self {
@@ -406,7 +412,7 @@ impl<'a> Compiler<'a> {
 
     pub fn add_constant(&mut self, obj: object::ObjectType) -> usize {
         self.constants.push(obj);
-        return self.constants.len() - 1;
+        self.constants.len() - 1
     }
 
     pub fn emit(&mut self, op: &Op, operands: Vec<usize>) -> usize {

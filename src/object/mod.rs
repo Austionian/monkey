@@ -89,7 +89,7 @@ impl Object for ObjectType {
             Self::HashObj(h) => format!(
                 "{{{}}}",
                 h.iter()
-                    .map(|(_, v)| format!("{}: {}", v.key.to_string(), v.value.to_string()))
+                    .map(|(_, v)| format!("{}: {}", v.key, v.value))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
