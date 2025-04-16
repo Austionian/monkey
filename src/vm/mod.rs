@@ -9,8 +9,13 @@ use anyhow::{anyhow, bail};
 use frame::Frame;
 use std::collections::HashMap;
 
+#[cfg(not(test))]
+pub const GLOBAL_SIZE: usize = 65536;
+// Running tests in parallel with large stacks, over flows the system stack
+#[cfg(test)]
+pub const GLOBAL_SIZE: usize = 100;
+
 const STACK_SIZE: usize = 2048;
-pub const GLOBAL_SIZE: usize = 1000; // TODO: look into why this can't be 65536
 const FRAME_SIZE: usize = 1024;
 const TRUE: ObjectType = ObjectType::BoolObj(true);
 const FALSE: ObjectType = ObjectType::BoolObj(false);
@@ -60,7 +65,6 @@ impl<'a> VM<'a> {
                     let const_index = code::read_u16(&instructions[ip + 1..]);
                     self.current_frame().ip += 2;
 
-                    // TODO: remove this clone and cast
                     self.push(self.constants[const_index as usize].clone())?;
                 }
                 Op::Add | code::Op::Sub | code::Op::Mul | code::Op::Div => {
@@ -212,7 +216,6 @@ impl<'a> VM<'a> {
     }
 
     fn execute_call(&mut self, num_args: usize) -> anyhow::Result<()> {
-        // TODO: get rid of this clone and pass frames by reference
         let callee = self.stack[self.sp - 1 - num_args].clone();
 
         match callee {
