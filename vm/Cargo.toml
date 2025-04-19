@@ -1,0 +1,12 @@
+[package]
+name = "vm"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+code = { path = "../code" }
+compiler = { path = "../compiler" }
+lexer = { path = "../lexer" }
+object = { path = "../object" }
+parser = { path = "../parser" }

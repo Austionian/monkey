@@ -1,0 +1,13 @@
+[package]
+name = "compiler"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+code = { path = "../code" }
+lexer = { path = "../lexer" }
+object = { path = "../object" }
+parser = { path = "../parser" }
+thiserror = "2.0.12"
+token = { path = "../token" }

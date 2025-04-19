@@ -1,0 +1,11 @@
+[package]
+name = "evaluator"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+lexer = { path = "../lexer" }
+object = { path = "../object" }
+parser = { path = "../parser" }
+token = { path = "../token" }
