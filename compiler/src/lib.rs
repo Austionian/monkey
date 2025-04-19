@@ -1,9 +1,9 @@
 pub mod symbol_table;
 use ast::{self, BlockStatement, Expression, LetStatement, ReturnStatement, Statement};
-use code::{self, Op, make};
+use code::{self, make, Op};
 use object::{self, ObjectType};
 use symbol_table::{
-    BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE, Symbol, SymbolTable,
+    Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE,
 };
 use thiserror::Error;
 use token::{Token, TokenLiteral};
@@ -103,6 +103,7 @@ impl Compile for Expression {
                     Token::Gt => compiler.emit(&Op::GreaterThan, vec![]),
                     Token::Eq => compiler.emit(&Op::Equal, vec![]),
                     Token::Not_eq => compiler.emit(&Op::NotEqual, vec![]),
+                    Token::Or => compiler.emit(&Op::Or, vec![]),
                     _ => todo!(),
                 };
             }
@@ -484,7 +485,7 @@ mod test {
     use core::panic;
     use lexer::Lexer;
     use object::ObjectType;
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
     use std::any::Any;
 
     struct CompilerTestCase {

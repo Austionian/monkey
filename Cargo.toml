@@ -8,7 +8,8 @@ members = [
   "lexer",
   "object",
   "parser",
-  "repl", "server",
+  "repl",
+  "server",
   "token",
   "vm",
 ]

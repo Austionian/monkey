@@ -73,7 +73,9 @@ impl<'a> VM<'a> {
                 }
                 Op::True => self.push(TRUE)?,
                 Op::False => self.push(FALSE)?,
-                Op::Equal | Op::NotEqual | Op::GreaterThan => self.execute_comparison(&op)?,
+                Op::Equal | Op::NotEqual | Op::GreaterThan | Op::Or => {
+                    self.execute_comparison(&op)?
+                }
                 Op::Bang => self.execute_bang_operator()?,
                 Op::Minus => self.execute_minus_operator()?,
                 Op::Jump => {
@@ -390,6 +392,9 @@ impl<'a> VM<'a> {
         match *op {
             Op::Equal => self.push(ObjectType::BoolObj(right == left)),
             Op::NotEqual => self.push(ObjectType::BoolObj(right != left)),
+            Op::Or => self.push(ObjectType::BoolObj(
+                right.to_native_bool() || left.to_native_bool(),
+            )),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
@@ -399,6 +404,7 @@ impl<'a> VM<'a> {
             Op::GreaterThan => self.push(ObjectType::BoolObj(left > right)),
             Op::Equal => self.push(ObjectType::BoolObj(left == right)),
             Op::NotEqual => self.push(ObjectType::BoolObj(left != right)),
+            Op::Or => self.push(ObjectType::BoolObj((left != 0.0) || (right != 0.0))),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
@@ -1191,5 +1197,29 @@ mod test {
         "#,
             610.0
         )]);
+    }
+
+    #[test]
+    fn test_or() {
+        run_vm_tests(vec![
+            vm_test_case!("true || true", true),
+            vm_test_case!("true || false", true),
+            vm_test_case!("false || false", false),
+            vm_test_case!("1 || 0;", true),
+            vm_test_case!("0 || 0;", false),
+            vm_test_case!("0 || false;", false),
+            vm_test_case!("false || \"this is a truthy sentence\";", true),
+            vm_test_case!(
+                r#"
+                    let x = 24;
+                    if (x == 24) {
+                        1;
+                    } else {
+                        48;
+                    }
+                "#,
+                1.0
+            ),
+        ]);
     }
 }

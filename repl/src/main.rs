@@ -1,14 +1,23 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use compiler::symbol_table::SymbolTable;
 use object::{Environment, ObjectType};
 use std::path::PathBuf;
 use vm::GLOBAL_SIZE;
 
+#[derive(ValueEnum, Clone, Default)]
+#[clap(rename_all = "kebab_case")]
+enum Mode {
+    #[default]
+    Repl,
+    Compile,
+    Eval,
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
     /// Optional mode to run in, default to repl
-    mode: Option<String>,
+    mode: Option<Mode>,
 
     /// Optional path to file to be run
     #[arg(long)]
@@ -17,9 +26,9 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    match args.mode.unwrap_or("repl".into()).as_str() {
-        "repl" => start(),
-        "eval" => {
+    match args.mode.unwrap_or(Mode::Repl) {
+        Mode::Repl => start(),
+        Mode::Eval => {
             if args.path.is_some() {
                 match std::fs::read_to_string(args.path.unwrap()) {
                     Ok(file) => {
@@ -35,7 +44,7 @@ fn main() {
                 }
             }
         }
-        "compile" => {
+        Mode::Compile => {
             if args.path.is_some() {
                 match std::fs::read_to_string(args.path.unwrap()) {
                     Ok(file) => {
@@ -51,8 +60,6 @@ fn main() {
                 start();
             }
         }
-        // the default is "repl" if no option is given
-        _ => unreachable!(),
     }
 }
 

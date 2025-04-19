@@ -1,5 +1,5 @@
 use std::char;
-use token::{look_up_ident, Token};
+use token::{Token, look_up_ident};
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
@@ -39,6 +39,14 @@ impl<'a> Lexer<'a> {
                     Token::Eq
                 } else {
                     Token::Assign
+                }
+            }
+            '|' => {
+                if self.peek_char() == b'|' {
+                    self.read_char();
+                    Token::Or
+                } else {
+                    Token::Illegal(self.input[self.position..self.position + 1].to_string())
                 }
             }
             ';' => Token::Semicolon,
@@ -208,6 +216,7 @@ mod tests {
             "foo bar";
             [1, 2];
             {"foo": "bar"};
+            true || false;
             "#;
 
         let expected = vec![
@@ -299,6 +308,10 @@ mod tests {
             Token::Colon,
             Token::String("bar".to_string()),
             Token::Rbrace,
+            Token::Semicolon,
+            Token::True,
+            Token::Or,
+            Token::False,
             Token::Semicolon,
             Token::Eof,
         ];

@@ -42,6 +42,15 @@ impl ObjectType {
             _ => Err(format!("unusable as a hash key: {}", self.r#type())),
         }
     }
+
+    pub fn to_native_bool(&self) -> bool {
+        match self {
+            Self::IntegerObj(v) => !(*v == 0.0),
+            Self::BoolObj(b) => *b,
+            Self::NullObj => false,
+            _ => true,
+        }
+    }
 }
 
 impl From<Token> for ObjectType {

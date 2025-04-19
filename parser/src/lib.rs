@@ -191,14 +191,15 @@ pub fn infix_function(token: &Token) -> Option<fn(&mut Parser, Expression) -> Ex
         | Token::Eq
         | Token::Not_eq
         | Token::Lt
-        | Token::Gt => Some(parse_infix_expression),
+        | Token::Gt
+        | Token::Or => Some(parse_infix_expression),
         Token::Lparen => Some(parse_call_expression),
         Token::Lbracket => Some(parse_index_expression),
         _ => None,
     }
 }
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub enum ExpressionPrecendence {
     LOWEST = 1,
     EQUALS = 2,
@@ -215,6 +216,7 @@ static TOKEN_PRECEDENCES: LazyLock<HashMap<Token, ExpressionPrecendence>> = Lazy
 
     map.insert(Token::Eq, ExpressionPrecendence::EQUALS);
     map.insert(Token::Not_eq, ExpressionPrecendence::EQUALS);
+    map.insert(Token::Or, ExpressionPrecendence::EQUALS);
     map.insert(Token::Lt, ExpressionPrecendence::LessGreater);
     map.insert(Token::Gt, ExpressionPrecendence::LessGreater);
     map.insert(Token::Plus, ExpressionPrecendence::SUM);
@@ -1107,6 +1109,24 @@ mod test {
                 _ => panic!("expected function literal"),
             },
             _ => panic!("expected let statement"),
+        }
+    }
+
+    #[test]
+    fn test_or() {
+        let input = "true || false;";
+        let program = test_setup!(input);
+
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::ExpressStatement(expression) => match expression {
+                Expression::InfixExpression((infix, left, right)) => {
+                    assert_eq!(*infix, Token::Or);
+                }
+                _ => panic!("expected infix expression"),
+            },
+            _ => panic!("expected expression statement"),
         }
     }
 

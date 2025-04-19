@@ -336,6 +336,7 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
     match token {
         Token::Eq => native_bool_to_bool_obj(left == right),
         Token::Not_eq => native_bool_to_bool_obj(left != right),
+        Token::Or => native_bool_to_bool_obj(left.to_native_bool() || right.to_native_bool()),
         _ => new_error(&format!(
             "unknown operator: {} {} {}",
             left.r#type(),
@@ -392,7 +393,11 @@ fn eval_bang_operator(right: ObjectType) -> ObjectType {
 }
 
 fn native_bool_to_bool_obj(input: bool) -> ObjectType {
-    if input { TRUE } else { FALSE }
+    if input {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 #[cfg(test)]
@@ -402,7 +407,7 @@ mod test {
     use lexer::Lexer;
     use object::Object;
     use object::ObjectType;
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);
@@ -883,5 +888,14 @@ mod test {
     fn test_hash_index_expressions_with_int() {
         let input = "{5: 5}[5];";
         test_integer_object(&test_eval(input), 5.0);
+    }
+
+    #[test]
+    fn test_infix_or() {
+        let input = "true || false;";
+        test_bool_object(&test_eval(input), true);
+
+        let input = "false || false;";
+        test_bool_object(&test_eval(input), false);
     }
 }

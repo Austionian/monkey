@@ -19,11 +19,12 @@ pub enum Token {
     Asterisk,
     Slash,
 
+    // Comparisons
     Lt,
     Gt,
-
     Eq,
     Not_eq,
+    Or,
 
     // Delimiters
     Comma,
@@ -92,6 +93,7 @@ impl TokenLiteral for Token {
             Token::Lbracket => "[".to_string(),
             Token::Rbracket => "]".to_string(),
             Token::Colon => ":".to_string(),
+            Token::Or => "||".to_string(),
         }
     }
 }

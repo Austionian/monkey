@@ -18,6 +18,7 @@ pub enum Op {
     Equal,
     NotEqual,
     GreaterThan,
+    Or,
 
     Minus,
     Bang,
@@ -95,6 +96,7 @@ impl Display for Op {
             Self::Closure => write!(f, "OpClosure"),
             Self::GetFree => write!(f, "OpGetFree"),
             Self::CurrentClosure => write!(f, "OpCurrentClosure"),
+            Self::Or => write!(f, "OpOr"),
         }
     }
 }
@@ -118,6 +120,7 @@ impl Op {
             | Self::ReturnValue
             | Self::Return
             | Self::CurrentClosure
+            | Self::Or
             | Self::Null => vec![],
 
             Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin | Self::GetFree => {
