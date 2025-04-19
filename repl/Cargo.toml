@@ -1,0 +1,13 @@
+[package]
+name = "repl"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.37", features = ["derive"] }
+compiler = { path = "../compiler" }
+object = { path = "../object" }
+vm = { path = "../vm" }
+lexer = { path = "../lexer" }
+parser = { path = "../parser" }
+evaluator = { path = "../evaluator" }

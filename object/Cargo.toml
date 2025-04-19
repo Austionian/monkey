@@ -1,0 +1,8 @@
+[package]
+name = "object"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+token = { path = "../token" }

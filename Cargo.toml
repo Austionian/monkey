@@ -1,9 +1,21 @@
-[package]
-name = "monkey-interpreter"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-[dependencies]
-anyhow = "1.0.97"
-clap = { version = "4.5.36", features = ["derive"] }
-thiserror = "2.0.12"
+members = [
+  "ast",
+  "code",
+  "compiler",
+  "evaluator",
+  "lexer",
+  "object",
+  "parser",
+  "repl", "server",
+  "token",
+  "vm",
+]
+
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Austin Rooks"]
+description = "The Monkey language Rust implementation"
