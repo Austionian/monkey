@@ -1,5 +1,4 @@
 use evaluator::eval_program;
-use lexer;
 use object::{Environment, Object};
 use parser::Parser;
 

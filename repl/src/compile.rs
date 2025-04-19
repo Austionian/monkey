@@ -1,5 +1,4 @@
 use compiler::{symbol_table::SymbolTable, Compiler};
-use lexer;
 use object::{Object, ObjectType};
 use parser::Parser;
 use vm::{GLOBAL_SIZE, VM};

@@ -6,7 +6,6 @@ pub use compile::compile;
 use compiler::{symbol_table::SymbolTable, Compiler};
 pub use eval::repl_start;
 pub use eval_file::eval;
-use lexer;
 use object::{Object, ObjectType};
 use parser::Parser;
 use std::{

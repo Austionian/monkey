@@ -1065,11 +1065,11 @@ mod test {
             Statement::ExpressStatement(expression) => match &expression {
                 Expression::HashLiteral(map) => {
                     assert_eq!(map.pairs.len(), 3);
-                    //for (k, v) in map.pairs.iter() {
-                    //    let key = k.clone().to_owned();
-                    //    let expected_value = expected.get(&key).unwrap();
-                    //    test_int_expression(v, *expected_value);
-                    //}
+                    for (k, v) in map.pairs.iter() {
+                        let key = k.clone().to_owned();
+                        let expected_value = expected.get(key.to_string().as_str()).unwrap();
+                        test_int_expression(v, *expected_value);
+                    }
                 }
                 _ => panic!("expected hash literal"),
             },
