@@ -1,4 +1,4 @@
-use compiler::{symbol_table::SymbolTable, Compiler};
+use compiler::{Compiler, symbol_table::SymbolTable};
 use object::{Object, ObjectType};
 use parser::Parser;
 use vm::{GLOBAL_SIZE, VM};

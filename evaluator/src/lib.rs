@@ -393,11 +393,7 @@ fn eval_bang_operator(right: ObjectType) -> ObjectType {
 }
 
 fn native_bool_to_bool_obj(input: bool) -> ObjectType {
-    if input {
-        TRUE
-    } else {
-        FALSE
-    }
+    if input { TRUE } else { FALSE }
 }
 
 #[cfg(test)]
@@ -407,7 +403,7 @@ mod test {
     use lexer::Lexer;
     use object::Object;
     use object::ObjectType;
-    use parser::{test_setup, Parser};
+    use parser::{Parser, test_setup};
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);

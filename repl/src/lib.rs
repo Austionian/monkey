@@ -3,7 +3,7 @@ mod eval;
 mod eval_file;
 
 pub use compile::compile;
-use compiler::{symbol_table::SymbolTable, Compiler};
+use compiler::{Compiler, symbol_table::SymbolTable};
 pub use eval::repl_start;
 pub use eval_file::eval;
 use object::{Object, ObjectType};
