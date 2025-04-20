@@ -1,9 +1,9 @@
 pub mod symbol_table;
 use ast::{self, BlockStatement, Expression, LetStatement, ReturnStatement, Statement};
-use code::{self, make, Op};
+use code::{self, Op, make};
 use object::{self, ObjectType};
 use symbol_table::{
-    Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE,
+    BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE, Symbol, SymbolTable,
 };
 use thiserror::Error;
 use token::{Token, TokenLiteral};
@@ -485,7 +485,7 @@ mod test {
     use core::panic;
     use lexer::Lexer;
     use object::ObjectType;
-    use parser::{test_setup, Parser};
+    use parser::{Parser, test_setup};
     use std::any::Any;
 
     struct CompilerTestCase {
