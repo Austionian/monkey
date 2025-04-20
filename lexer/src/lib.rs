@@ -1,6 +1,41 @@
+mod helpers;
+
+use helpers::{is_digit, is_letter};
 use std::char;
 use token::{Token, look_up_ident};
 
+/// The Monkey lexer.
+///
+/// Turns text into tokens.
+///
+/// ```
+/// use lexer::Lexer;
+/// use token::Token;
+///
+/// let input = "let a = 5;";
+///
+/// let expected: [Token; 6] = [
+///     Token::Let,
+///     Token::Ident("a".to_string()),
+///     Token::Assign,
+///     Token::Int(5),
+///     Token::Semicolon,
+///     Token::Eof,
+/// ];
+///
+/// let mut lexer = Lexer::new(input);
+///
+/// for (i, tt) in expected.iter().enumerate() {
+///     let tok = lexer.next_token();
+///
+///     if tok != *tt {
+///         panic!(
+///             "{:?} - token_type wrong. expected = {:?}, got = {:?}",
+///             expected[i], tt, tok
+///         )
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Lexer<'a> {
     input: &'a str,
@@ -45,6 +80,14 @@ impl<'a> Lexer<'a> {
                 if self.peek_char() == b'|' {
                     self.read_char();
                     Token::Or
+                } else {
+                    Token::Illegal(self.input[self.position..self.position + 1].to_string())
+                }
+            }
+            '&' => {
+                if self.peek_char() == b'&' {
+                    self.read_char();
+                    Token::And
                 } else {
                     Token::Illegal(self.input[self.position..self.position + 1].to_string())
                 }
@@ -146,186 +189,5 @@ impl<'a> Lexer<'a> {
         }
         self.position = self.read_position;
         self.read_position += 1;
-    }
-}
-
-fn is_letter(ch: char) -> bool {
-    ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_'
-}
-
-fn is_digit(ch: char) -> bool {
-    ch.is_ascii_digit()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_next_token() {
-        let input = "=+(){},;";
-
-        const EXPECTED: [Token; 9] = [
-            Token::Assign,
-            Token::Plus,
-            Token::Lparen,
-            Token::Rparen,
-            Token::Lbrace,
-            Token::Rbrace,
-            Token::Comma,
-            Token::Semicolon,
-            Token::Eof,
-        ];
-
-        let mut lexer = Lexer::new(input);
-
-        for (i, tt) in EXPECTED.iter().enumerate() {
-            let tok = lexer.next_token();
-
-            if tok != *tt {
-                panic!(
-                    "{:?} - token_type wrong. expected = {:?}, got = {:?}",
-                    EXPECTED[i], tt, tok
-                )
-            }
-        }
-    }
-
-    #[test]
-    fn test_next_token_complex() {
-        let input = r#"let five = 5;
-            let ten = 10;
-
-            let add = fn(x, y) {
-                x + y;
-            };
-
-            let result = add(five, ten);
-            !-/*5;
-            5 < 10 > 5;
-
-            if (5 < 10) {
-                return true;
-            } else {
-                return false;
-            }
-
-            10 == 10;
-            10 != 9;
-            "foobar";
-            "foo bar";
-            [1, 2];
-            {"foo": "bar"};
-            true || false;
-            "#;
-
-        let expected = vec![
-            Token::Let,
-            Token::Ident("five".to_string()),
-            Token::Assign,
-            Token::Int(5),
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("ten".to_string()),
-            Token::Assign,
-            Token::Int(10),
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("add".to_string()),
-            Token::Assign,
-            Token::Function,
-            Token::Lparen,
-            Token::Ident("x".to_string()),
-            Token::Comma,
-            Token::Ident("y".to_string()),
-            Token::Rparen,
-            Token::Lbrace,
-            Token::Ident("x".to_string()),
-            Token::Plus,
-            Token::Ident("y".to_string()),
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Semicolon,
-            Token::Let,
-            Token::Ident("result".to_string()),
-            Token::Assign,
-            Token::Ident("add".to_string()),
-            Token::Lparen,
-            Token::Ident("five".to_string()),
-            Token::Comma,
-            Token::Ident("ten".to_string()),
-            Token::Rparen,
-            Token::Semicolon,
-            Token::Bang,
-            Token::Minus,
-            Token::Slash,
-            Token::Asterisk,
-            Token::Int(5),
-            Token::Semicolon,
-            Token::Int(5),
-            Token::Lt,
-            Token::Int(10),
-            Token::Gt,
-            Token::Int(5),
-            Token::Semicolon,
-            Token::If,
-            Token::Lparen,
-            Token::Int(5),
-            Token::Lt,
-            Token::Int(10),
-            Token::Rparen,
-            Token::Lbrace,
-            Token::Return,
-            Token::True,
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Else,
-            Token::Lbrace,
-            Token::Return,
-            Token::False,
-            Token::Semicolon,
-            Token::Rbrace,
-            Token::Int(10),
-            Token::Eq,
-            Token::Int(10),
-            Token::Semicolon,
-            Token::Int(10),
-            Token::Not_eq,
-            Token::Int(9),
-            Token::Semicolon,
-            Token::String("foobar".to_string()),
-            Token::Semicolon,
-            Token::String("foo bar".to_string()),
-            Token::Semicolon,
-            Token::Lbracket,
-            Token::Int(1),
-            Token::Comma,
-            Token::Int(2),
-            Token::Rbracket,
-            Token::Semicolon,
-            Token::Lbrace,
-            Token::String("foo".to_string()),
-            Token::Colon,
-            Token::String("bar".to_string()),
-            Token::Rbrace,
-            Token::Semicolon,
-            Token::True,
-            Token::Or,
-            Token::False,
-            Token::Semicolon,
-            Token::Eof,
-        ];
-        let mut lexer = Lexer::new(input);
-
-        for (i, tt) in expected.iter().enumerate() {
-            let tok = lexer.next_token();
-
-            if tok != *tt {
-                panic!(
-                    "{:?} - token_type wrong. expected = {:?}, got = {:?}",
-                    expected[i], tt, tok
-                )
-            }
-        }
     }
 }

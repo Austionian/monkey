@@ -24,7 +24,9 @@ pub enum Token {
     Gt,
     Eq,
     Not_eq,
+
     Or,
+    And,
 
     // Delimiters
     Comma,
@@ -94,6 +96,7 @@ impl TokenLiteral for Token {
             Token::Rbracket => "]".to_string(),
             Token::Colon => ":".to_string(),
             Token::Or => "||".to_string(),
+            Token::And => "&&".to_string(),
         }
     }
 }

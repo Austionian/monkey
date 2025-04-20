@@ -73,7 +73,7 @@ impl<'a> VM<'a> {
                 }
                 Op::True => self.push(TRUE)?,
                 Op::False => self.push(FALSE)?,
-                Op::Equal | Op::NotEqual | Op::GreaterThan | Op::Or => {
+                Op::Equal | Op::NotEqual | Op::GreaterThan | Op::Or | Op::And => {
                     self.execute_comparison(&op)?
                 }
                 Op::Bang => self.execute_bang_operator()?,
@@ -395,6 +395,9 @@ impl<'a> VM<'a> {
             Op::Or => self.push(ObjectType::BoolObj(
                 right.to_native_bool() || left.to_native_bool(),
             )),
+            Op::And => self.push(ObjectType::BoolObj(
+                right.to_native_bool() && left.to_native_bool(),
+            )),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
@@ -405,6 +408,7 @@ impl<'a> VM<'a> {
             Op::Equal => self.push(ObjectType::BoolObj(left == right)),
             Op::NotEqual => self.push(ObjectType::BoolObj(left != right)),
             Op::Or => self.push(ObjectType::BoolObj((left != 0.0) || (right != 0.0))),
+            Op::And => self.push(ObjectType::BoolObj((left != 0.0) && (right != 0.0))),
             _ => anyhow::bail!("Unknown operator: {}", op),
         }
     }
@@ -1212,7 +1216,7 @@ mod test {
             vm_test_case!(
                 r#"
                     let x = 24;
-                    if (x == 24) {
+                    if (x == 24 || false) {
                         1;
                     } else {
                         48;
@@ -1220,6 +1224,17 @@ mod test {
                 "#,
                 1.0
             ),
+        ]);
+    }
+
+    #[test]
+    fn test_and() {
+        run_vm_tests(vec![
+            vm_test_case!("true && true", true),
+            vm_test_case!("false && true", false),
+            vm_test_case!("true && 0", false),
+            vm_test_case!("45 && 1", true),
+            vm_test_case!("0 && 5", false),
         ]);
     }
 }

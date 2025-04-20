@@ -337,6 +337,7 @@ fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) ->
         Token::Eq => native_bool_to_bool_obj(left == right),
         Token::Not_eq => native_bool_to_bool_obj(left != right),
         Token::Or => native_bool_to_bool_obj(left.to_native_bool() || right.to_native_bool()),
+        Token::And => native_bool_to_bool_obj(left.to_native_bool() && right.to_native_bool()),
         _ => new_error(&format!(
             "unknown operator: {} {} {}",
             left.r#type(),
@@ -893,5 +894,14 @@ mod test {
 
         let input = "false || false;";
         test_bool_object(&test_eval(input), false);
+    }
+
+    #[test]
+    fn test_infix_and() {
+        let input = "true && false;";
+        test_bool_object(&test_eval(input), false);
+
+        let input = "true && true;";
+        test_bool_object(&test_eval(input), true);
     }
 }

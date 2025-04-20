@@ -104,6 +104,7 @@ impl Compile for Expression {
                     Token::Eq => compiler.emit(&Op::Equal, vec![]),
                     Token::Not_eq => compiler.emit(&Op::NotEqual, vec![]),
                     Token::Or => compiler.emit(&Op::Or, vec![]),
+                    Token::And => compiler.emit(&Op::And, vec![]),
                     _ => todo!(),
                 };
             }
