@@ -27,7 +27,22 @@ struct Args {
 fn main() {
     let args = Args::parse();
     match args.mode.unwrap_or(Mode::Repl) {
-        Mode::Repl => start(),
+        Mode::Repl | Mode::Compile => {
+            if args.path.is_some() {
+                match std::fs::read_to_string(args.path.unwrap()) {
+                    Ok(file) => {
+                        let mut constants = Vec::new();
+                        let symbol_table = SymbolTable::new();
+                        let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
+
+                        repl::compile(&mut constants, symbol_table, &mut globals, &file);
+                    }
+                    Err(_) => eprintln!("no such file"),
+                }
+            } else {
+                start();
+            }
+        }
         Mode::Eval => {
             if args.path.is_some() {
                 match std::fs::read_to_string(args.path.unwrap()) {
@@ -42,22 +57,6 @@ fn main() {
                     let mut env = Environment::new();
                     repl::repl_start(&mut env);
                 }
-            }
-        }
-        Mode::Compile => {
-            if args.path.is_some() {
-                match std::fs::read_to_string(args.path.unwrap()) {
-                    Ok(file) => {
-                        let mut constants = Vec::new();
-                        let symbol_table = SymbolTable::new();
-                        let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
-
-                        repl::compile(&mut constants, symbol_table, &mut globals, &file);
-                    }
-                    Err(_) => eprintln!("no such file"),
-                }
-            } else {
-                start();
             }
         }
     }

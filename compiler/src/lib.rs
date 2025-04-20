@@ -1,9 +1,9 @@
 pub mod symbol_table;
 use ast::{self, BlockStatement, Expression, LetStatement, ReturnStatement, Statement};
-use code::{self, Op, make};
+use code::{self, make, Op};
 use object::{self, ObjectType};
 use symbol_table::{
-    BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE, Symbol, SymbolTable,
+    Symbol, SymbolTable, BUILTIN_SCOPE, FREE_SCOPE, FUNCTION_SCOPE, GLOBAL_SCOPE, LOCAL_SCOPE,
 };
 use thiserror::Error;
 use token::{Token, TokenLiteral};
@@ -461,7 +461,6 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn load_symbol(&mut self, symbol: &Symbol) {
-        println!("{symbol:?}");
         match symbol.scope {
             GLOBAL_SCOPE => self.emit(&Op::GetGlobal, vec![symbol.index]),
             LOCAL_SCOPE => self.emit(&Op::GetLocal, vec![symbol.index]),
@@ -486,7 +485,7 @@ mod test {
     use core::panic;
     use lexer::Lexer;
     use object::ObjectType;
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
     use std::any::Any;
 
     struct CompilerTestCase {
