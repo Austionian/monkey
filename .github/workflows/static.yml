@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
-        working-dir: ./wasm
+        working-directory: ./wasm
         with:
           node-version: lts/*
           cache: "npm"
@@ -47,7 +47,7 @@ jobs:
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-        working-dir: ./wasm
+        working-directory: ./wasm
         with:
           # Upload dist folder
           path: "./dist"
