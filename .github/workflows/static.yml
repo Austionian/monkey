@@ -27,9 +27,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./wasm
     steps:
-      - name: cd into dir
-        run: cd wasm
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node
