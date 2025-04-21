@@ -37,8 +37,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          working-directory: ./wasm
           cache: "npm"
+          cache-dependency-path: "./wasm/package-lock.json"
       - name: Install dependencies
         run: npm ci
       - name: Build
@@ -48,9 +48,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          working-directory: ./wasm
           # Upload dist folder
-          path: "./dist"
+          path: "./wasm/dist"
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
