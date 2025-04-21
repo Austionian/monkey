@@ -34,9 +34,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup wasm
-        uses: jetli/wasm-bindgen-action@v0.2.0
+        uses: jetli/wasm-pack-action@v0.4.0
         with:
-          # Optional version of wasm-bindgen to install(eg. '0.2.83', 'latest')
           version: "latest"
       - name: Build wasm
         run: wasm-pack build --release --target web
