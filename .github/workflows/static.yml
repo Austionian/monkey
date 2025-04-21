@@ -35,9 +35,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
-        working-directory: ./wasm
         with:
           node-version: lts/*
+          working-directory: ./wasm
           cache: "npm"
       - name: Install dependencies
         run: npm ci
@@ -47,8 +47,8 @@ jobs:
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-        working-directory: ./wasm
         with:
+          working-directory: ./wasm
           # Upload dist folder
           path: "./dist"
       - name: Deploy to GitHub Pages
