@@ -1,0 +1,19 @@
+[package]
+name = "wasm"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+compiler = { path = "../compiler" }
+lexer = { path = "../lexer" }
+object = { path = "../object" }
+parser = { path = "../parser" }
+vm = { path = "../vm" }
+wasm-bindgen = "0.2.100"
+
+[lib]
+crate-type = ["cdylib"]

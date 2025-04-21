@@ -7,8 +7,11 @@ use frame::Frame;
 use object::{BUILTINS, BuiltinFn, HashPair, ObjectType};
 use std::collections::HashMap;
 
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_family = "wasm")))]
 pub const GLOBAL_SIZE: usize = 65536;
+// Stacks can't be too big in wasm sandbox
+#[cfg(target_family = "wasm")]
+pub const GLOBAL_SIZE: usize = 1000;
 // Running tests in parallel with large stacks, over flows the system stack
 #[cfg(test)]
 pub const GLOBAL_SIZE: usize = 100;

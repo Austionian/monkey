@@ -1,0 +1,15 @@
+build-wasm:
+  #!/bin/bash
+  wasm-pack build --release --target web
+
+build-js:
+  #!/bin/bash
+  npm run build
+
+build:
+  #!/bin/bash
+  just build-wasm && just build-js
+
+dev:
+  #!/bin/bash
+  npm run dev

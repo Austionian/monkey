@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
   "ast",
   "code",
@@ -9,14 +8,16 @@ members = [
   "object",
   "parser",
   "repl",
-  "server",
   "token",
   "vm",
+  "wasm",
 ]
-
+exclude = []
 resolver = "3"
 
 [workspace.package]
 version = "0.1.0"
 authors = ["Austin Rooks"]
 description = "The Monkey language Rust implementation"
+repository = "https://github.com/Austionian/monkey"
+license = "MIT"

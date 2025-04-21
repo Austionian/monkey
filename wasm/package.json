@@ -1,0 +1,28 @@
+{
+  "name": "wasm",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "The Monkey lang playground",
+  "devDependencies": {
+    "vite": "^6.3.2"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.2",
+    "fdir": "^6.4.4",
+    "monkey": "file:./pkg",
+    "nanoid": "^3.3.11",
+    "picocolors": "^1.1.1",
+    "picomatch": "^4.0.2",
+    "postcss": "^8.5.3",
+    "rollup": "^4.40.0",
+    "source-map-js": "^1.2.1",
+    "tinyglobby": "^0.2.13"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "author": "Austin Rooks",
+  "license": "MIT"
+}
