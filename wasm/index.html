@@ -1,12 +1,30 @@
 <!doctype html>
-<html lang="en-US">
+<html lang="en-US" data-theme="coffee">
   <head>
     <meta charset="utf-8" />
     <title>hello-wasm example</title>
+    <link rel="stylesheet" href="./web/styles/styles.css" />
   </head>
   <body>
-    <script type="module" src="./main.js"></script>
-    <textarea id="i"></textarea>
-    <button id="btn">submit</button>
+    <header class="flex flex-col m-6">
+      <h1 class="text-3xl font-extrabold">Monkey</h1>
+      <div class="w-full">
+        <div class="divider"></div>
+      </div>
+    </header>
+    <main class="flex flex-col mx-6 gap-4">
+      <textarea
+        id="i"
+        class="textarea w-full h-96 font-mono"
+        placeholder="let a = 5;"
+      ></textarea>
+      <div>
+        <button id="btn" class="btn btn-primary">submit</button>
+      </div>
+      <h2 class="text-xl mt-6">Output:</h2>
+      <div id="output" class="font-mono"></div>
+    </main>
+    <footer></footer>
+    <script type="module" src="./web/main.js"></script>
   </body>
 </html>

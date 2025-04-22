@@ -1,15 +1,23 @@
+# List available commands
+default:
+    just -l
+
+# Build the Monkey compiler to wasm
 build-wasm:
   #!/bin/bash
   wasm-pack build --release --target web
 
+# Build the vite app
 build-js:
   #!/bin/bash
   npm run build
 
+# Build the Monkey compiler and vite app
 build:
   #!/bin/bash
   just build-wasm && just build-js
 
+# Run the vite server
 dev:
   #!/bin/bash
   npm run dev

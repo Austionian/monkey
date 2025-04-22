@@ -1,4 +1,4 @@
-use compiler::{Compiler, symbol_table::SymbolTable};
+use compiler::{symbol_table::SymbolTable, Compiler};
 use lexer::Lexer;
 use object::{Object, ObjectType};
 use parser::Parser;
@@ -11,8 +11,8 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
+pub fn print(name: &str) {
+    alert(&format!("result:, {}", name));
 }
 
 #[wasm_bindgen]
@@ -52,5 +52,5 @@ pub fn execute(buffer: &str) -> String {
         return stack_top.inspect();
     }
 
-    String::new()
+    String::from("Not sure how you ended up here, friend, but welcome.")
 }
