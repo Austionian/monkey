@@ -1,4 +1,4 @@
-use compiler::{symbol_table::SymbolTable, Compiler};
+use compiler::{Compiler, symbol_table::SymbolTable};
 use lexer::Lexer;
 use object::{Object, ObjectType};
 use parser::Parser;
