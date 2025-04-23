@@ -430,9 +430,7 @@ impl<'a> Compiler<'a> {
     fn replace_instruction(&mut self, position: usize, new_instruction: Vec<u8>) {
         let ins = self.current_instructions();
 
-        for i in 0..new_instruction.len() {
-            ins[position + i] = new_instruction[i]
-        }
+        ins[position..(new_instruction.len() + position)].copy_from_slice(&new_instruction[..]);
     }
 
     fn replace_last_pop_with_return(&mut self) {

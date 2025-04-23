@@ -5,32 +5,32 @@ use token::Token;
 
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub enum ExpressionPrecendence {
-    LOWEST = 1,
-    LazyCompare = 2,
-    EQUALS = 3,
+    Lowest = 1,
+    LogicalOperator = 2,
+    Equals = 3,
     LessGreater = 4,
-    SUM = 5,
-    PRODUCT = 6,
-    PREFIX = 7,
-    CALL = 8,
-    INDEX = 9,
+    Sum = 5,
+    Product = 6,
+    Prefix = 7,
+    Call = 8,
+    Index = 9,
 }
 
 static TOKEN_PRECEDENCES: LazyLock<HashMap<Token, ExpressionPrecendence>> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
-    map.insert(Token::Or, ExpressionPrecendence::LazyCompare);
-    map.insert(Token::And, ExpressionPrecendence::LazyCompare);
-    map.insert(Token::Eq, ExpressionPrecendence::EQUALS);
-    map.insert(Token::Not_eq, ExpressionPrecendence::EQUALS);
+    map.insert(Token::Or, ExpressionPrecendence::LogicalOperator);
+    map.insert(Token::And, ExpressionPrecendence::LogicalOperator);
+    map.insert(Token::Eq, ExpressionPrecendence::Equals);
+    map.insert(Token::Not_eq, ExpressionPrecendence::Equals);
     map.insert(Token::Lt, ExpressionPrecendence::LessGreater);
     map.insert(Token::Gt, ExpressionPrecendence::LessGreater);
-    map.insert(Token::Plus, ExpressionPrecendence::SUM);
-    map.insert(Token::Minus, ExpressionPrecendence::SUM);
-    map.insert(Token::Slash, ExpressionPrecendence::PRODUCT);
-    map.insert(Token::Asterisk, ExpressionPrecendence::PRODUCT);
-    map.insert(Token::Lparen, ExpressionPrecendence::CALL);
-    map.insert(Token::Lbracket, ExpressionPrecendence::INDEX);
+    map.insert(Token::Plus, ExpressionPrecendence::Sum);
+    map.insert(Token::Minus, ExpressionPrecendence::Sum);
+    map.insert(Token::Slash, ExpressionPrecendence::Product);
+    map.insert(Token::Asterisk, ExpressionPrecendence::Product);
+    map.insert(Token::Lparen, ExpressionPrecendence::Call);
+    map.insert(Token::Lbracket, ExpressionPrecendence::Index);
 
     map
 });
@@ -135,7 +135,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<Statement, String> {
         let statement = self
-            .parse_expression(ExpressionPrecendence::LOWEST)
+            .parse_expression(ExpressionPrecendence::Lowest)
             .ok_or("No expression found")?;
 
         if self.peek_token_is(&Token::Semicolon) {
@@ -169,7 +169,7 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         statement.value = self
-            .parse_expression(ExpressionPrecendence::LOWEST)
+            .parse_expression(ExpressionPrecendence::Lowest)
             .ok_or("Failed to parse expression")?;
 
         if self.peek_token_is(&Token::Semicolon) {
@@ -203,7 +203,7 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         statement.value = self
-            .parse_expression(ExpressionPrecendence::LOWEST)
+            .parse_expression(ExpressionPrecendence::Lowest)
             .ok_or("failed to parse expression")?;
 
         if let Expression::FunctionLiteral(_, _, _, ref rc) = statement.value {
@@ -254,7 +254,7 @@ impl<'a> Parser<'a> {
         if let Some(precedence) = TOKEN_PRECEDENCES.get(&self.peek_token) {
             precedence.clone()
         } else {
-            ExpressionPrecendence::LOWEST
+            ExpressionPrecendence::Lowest
         }
     }
 
@@ -262,7 +262,7 @@ impl<'a> Parser<'a> {
         if let Some(precedence) = TOKEN_PRECEDENCES.get(&self.cur_token) {
             precedence.clone()
         } else {
-            ExpressionPrecendence::LOWEST
+            ExpressionPrecendence::Lowest
         }
     }
 
@@ -288,12 +288,12 @@ impl<'a> Parser<'a> {
         }
 
         self.next_token();
-        list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+        list.push(self.parse_expression(ExpressionPrecendence::Lowest)?);
 
         while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
-            list.push(self.parse_expression(ExpressionPrecendence::LOWEST)?);
+            list.push(self.parse_expression(ExpressionPrecendence::Lowest)?);
         }
 
         if !self.expect_peek(end) {
@@ -342,7 +342,7 @@ fn parse_int(p: &mut Parser) -> Option<Expression> {
 fn parse_prefix_expression(p: &mut Parser) -> Option<Expression> {
     let prefix = p.cur_token.clone();
     p.next_token();
-    let right = p.parse_expression(ExpressionPrecendence::PREFIX).unwrap();
+    let right = p.parse_expression(ExpressionPrecendence::Prefix).unwrap();
     Some(Expression::PrefixExpression((prefix, Box::new(right))))
 }
 
@@ -353,7 +353,7 @@ fn parse_bool_expression(p: &mut Parser) -> Option<Expression> {
 fn parse_grouped_expression(p: &mut Parser) -> Option<Expression> {
     p.next_token();
 
-    let exp = p.parse_expression(ExpressionPrecendence::LOWEST);
+    let exp = p.parse_expression(ExpressionPrecendence::Lowest);
 
     if !p.expect_peek(&Token::Rparen) {
         return None;
@@ -392,7 +392,7 @@ fn parse_if_expression(p: &mut Parser) -> Option<Expression> {
 
     p.next_token();
 
-    let condition = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+    let condition = p.parse_expression(ExpressionPrecendence::Lowest)?;
 
     if !p.expect_peek(&Token::Rparen) {
         return None;
@@ -453,7 +453,7 @@ fn parse_array_expression(p: &mut Parser) -> Option<Expression> {
 fn parse_index_expression(p: &mut Parser, left: Expression) -> Expression {
     p.next_token();
     let index = p
-        .parse_expression(ExpressionPrecendence::LOWEST)
+        .parse_expression(ExpressionPrecendence::Lowest)
         .unwrap_or_default();
 
     if !p.expect_peek(&Token::Rbracket) {
@@ -468,14 +468,14 @@ fn parse_hash_literal(p: &mut Parser) -> Option<Expression> {
 
     while !p.peek_token_is(&Token::Rbrace) {
         p.next_token();
-        let key = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+        let key = p.parse_expression(ExpressionPrecendence::Lowest)?;
 
         if !p.expect_peek(&Token::Colon) {
             return None;
         }
 
         p.next_token();
-        let value = p.parse_expression(ExpressionPrecendence::LOWEST)?;
+        let value = p.parse_expression(ExpressionPrecendence::Lowest)?;
 
         // this is a hacky way to get around hashing the Expression
         pairs.insert(key, value);

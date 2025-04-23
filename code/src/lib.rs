@@ -100,9 +100,7 @@ pub fn instruction_to_string(ins: &Instructions) -> String {
 
     let mut i = 0;
     while i < ins.len() {
-        //let def = look_up(&ins[i]).unwrap();
-
-        let op = unsafe { transmute(ins[i]) };
+        let op = unsafe { transmute::<u8, Op>(ins[i]) };
         let (operands, read) = read_operands(&op, &ins[i + 1..]);
 
         out.push_str(&format!(

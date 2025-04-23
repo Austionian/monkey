@@ -1,3 +1,4 @@
+use crate::parse_errors;
 use compiler::{Compiler, symbol_table::SymbolTable};
 use object::{Object, ObjectType};
 use parser::Parser;
@@ -14,14 +15,7 @@ pub fn compile(
 
     let program = parser.parse_program();
 
-    if !parser.errors.is_empty() {
-        eprintln!("Whoops! We ran into some monkey business here!");
-        eprintln!("parser errors:");
-        for error in parser.errors {
-            eprintln!("\t{error}");
-        }
-        return symbol_table;
-    }
+    parse_errors!(parser, symbol_table);
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);

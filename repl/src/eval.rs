@@ -1,3 +1,4 @@
+use crate::parse_errors;
 use evaluator::eval_program;
 use object::{Environment, Object};
 use parser::Parser;
@@ -24,31 +25,10 @@ pub fn repl_start(env: &mut Environment) {
 
     let program = parser.parse_program();
 
-    if !parser.errors.is_empty() {
-        eprintln!("{MONKEY_FACE}");
-        eprintln!("Whoops! We ran into some monkey business here!");
-        eprintln!("parser errors:");
-        for error in parser.errors {
-            eprintln!("\t{error}");
-        }
-        return;
-    }
+    parse_errors!(parser);
 
     if let Ok(program) = program {
         let evaluated = eval_program(&program, env);
         println!("{}", evaluated.inspect());
     }
 }
-
-const MONKEY_FACE: &str = r#"            __,__
-   .--.  .-"     "-.  .--.
-  / .. \/  .-. .-.  \/ .. \
- | |  '|  /   Y   \  |'  | |
- | \   \  \ 0 | 0 /  /   / |
-  \ '- ,\.-"""""""-./, -' /
-   ''-' /_   ^ ^   _\ '-''
-       |  \._   _./  |
-       \   \ '~' /   /
-        '._ '-=-' _.'
-           '-----'
-"#;

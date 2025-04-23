@@ -305,10 +305,7 @@ fn eval_if_expression(
 }
 
 fn is_truthy(obj: ObjectType) -> bool {
-    match obj {
-        ObjectType::NullObj | ObjectType::BoolObj(false) => false,
-        _ => true,
-    }
+    !matches!(obj, ObjectType::NullObj | ObjectType::BoolObj(false))
 }
 
 fn eval_infix_statement(token: &Token, left: &ObjectType, right: &ObjectType) -> ObjectType {
@@ -394,7 +391,11 @@ fn eval_bang_operator(right: ObjectType) -> ObjectType {
 }
 
 fn native_bool_to_bool_obj(input: bool) -> ObjectType {
-    if input { TRUE } else { FALSE }
+    if input {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 #[cfg(test)]
@@ -404,7 +405,7 @@ mod test {
     use lexer::Lexer;
     use object::Object;
     use object::ObjectType;
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);

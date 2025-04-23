@@ -16,18 +16,31 @@ use vm::{GLOBAL_SIZE, VM};
 
 const PROMPT: &str = ">> ";
 
-pub fn parse_errors(parser: &Parser) -> Result<(), ()> {
-    if !parser.errors.is_empty() {
-        eprintln!("{MONKEY_FACE}");
-        eprintln!("Whoops! We ran into some monkey business here!");
-        eprintln!("parser errors:");
-        for error in parser.errors.iter() {
-            eprintln!("\t{error}");
+#[macro_export]
+macro_rules! parse_errors {
+    ($p:expr) => {{
+        if !$p.errors.is_empty() {
+            eprintln!("{}", $crate::MONKEY_FACE);
+            eprintln!("Whoops! We ran into some monkey business here!");
+            eprintln!("parser errors:");
+            for error in $p.errors.iter() {
+                eprintln!("\t{error}");
+            }
+            return;
         }
-        return Err(());
-    }
+    }};
 
-    Ok(())
+    ($p:expr, $symbol_table:expr) => {{
+        if !$p.errors.is_empty() {
+            eprintln!("{}", $crate::MONKEY_FACE);
+            eprintln!("Whoops! We ran into some monkey business here!");
+            eprintln!("parser errors:");
+            for error in $p.errors.iter() {
+                eprintln!("\t{error}");
+            }
+            return $symbol_table;
+        }
+    }};
 }
 
 pub fn start(
@@ -50,12 +63,7 @@ pub fn start(
 
     let program = parser.parse_program();
 
-    match parse_errors(&parser) {
-        Ok(_) => {}
-        Err(_) => {
-            return symbol_table;
-        }
-    };
+    parse_errors!(parser, symbol_table);
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);
@@ -78,7 +86,7 @@ pub fn start(
     symbol_table
 }
 
-const MONKEY_FACE: &str = r#"            __,__
+pub const MONKEY_FACE: &str = r#"            __,__
    .--.  .-"     "-.  .--.
   / .. \/  .-. .-.  \/ .. \
  | |  '|  /   Y   \  |'  | |

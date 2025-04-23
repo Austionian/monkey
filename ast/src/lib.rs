@@ -69,10 +69,6 @@ impl PartialEq for Map {
     fn eq(&self, _: &Self) -> bool {
         todo!()
     }
-
-    fn ne(&self, _: &Self) -> bool {
-        todo!()
-    }
 }
 
 impl Default for Expression {
