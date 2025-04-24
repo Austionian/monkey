@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail};
 use code::{self, Op};
 use compiler::Compiler;
 use frame::Frame;
-use object::{BuiltinFn, HashPair, ObjectType, BUILTINS};
+use object::{BUILTINS, BuiltinFn, HashPair, ObjectType};
 use std::collections::HashMap;
 
 #[cfg(all(not(test), not(target_family = "wasm")))]
@@ -504,11 +504,11 @@ impl<'a> VM<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use compiler::{symbol_table::SymbolTable, Compiler};
+    use compiler::{Compiler, symbol_table::SymbolTable};
     use core::panic;
     use lexer::Lexer;
     use object::{self, ObjectType};
-    use parser::{test_setup, Parser};
+    use parser::{Parser, test_setup};
     use std::{any::Any, collections::HashMap};
 
     struct VmTestCase {

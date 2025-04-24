@@ -1,6 +1,6 @@
 mod builtins;
 use ast::BlockStatement;
-pub use builtins::{get_builtin_by_name, BUILTINS};
+pub use builtins::{BUILTINS, get_builtin_by_name};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
