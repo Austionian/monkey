@@ -632,6 +632,23 @@ fn test_and() {
     }
 }
 
+#[test]
+fn test_loop() {
+    let input = "loop { let a = 5; break; }";
+    let program = test_setup!(input);
+
+    assert_eq!(program.statements.len(), 1);
+
+    match &program.statements[0] {
+        Statement::LoopStatement(BlockStatement { statements }) => {
+            assert_eq!(statements.len(), 2);
+            assert!(test_statement(&statements[0], "a"));
+            assert_eq!(statements[1], Statement::BreakStatement);
+        }
+        _ => panic!("expected a loop statement"),
+    }
+}
+
 fn test_ident_expression(expression: &Expression, expected_token: &str) {
     match expression {
         Expression::IdentExpression(t) => {

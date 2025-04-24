@@ -52,7 +52,18 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
             env.set(&let_statement.name.token_literal(), value)
         }
         Statement::BlockStatement(block_statement) => eval_block_statements(block_statement, env),
+        Statement::LoopStatement(block_statement) => eval_loop_statement(block_statement, env),
+        Statement::BreakStatement => ObjectType::Break,
     }
+}
+
+fn eval_loop_statement(block: &BlockStatement, env: &mut Environment) -> ObjectType {
+    let result = eval_block_statements(block, env);
+    if result == ObjectType::Break {
+        return ObjectType::NullObj;
+    }
+
+    eval_loop_statement(block, env)
 }
 
 fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType {
@@ -275,6 +286,7 @@ fn eval_block_statements(block: &BlockStatement, env: &mut Environment) -> Objec
         if result != NULL
             && result_type == std::mem::discriminant(&ObjectType::ReturnValueObj(Box::default()))
             || result_type == std::mem::discriminant(&ObjectType::ErrorObj(String::default()))
+            || result_type == std::mem::discriminant(&ObjectType::Break)
         {
             return result;
         }
@@ -391,7 +403,11 @@ fn eval_bang_operator(right: ObjectType) -> ObjectType {
 }
 
 fn native_bool_to_bool_obj(input: bool) -> ObjectType {
-    if input { TRUE } else { FALSE }
+    if input {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 #[cfg(test)]
@@ -401,7 +417,7 @@ mod test {
     use lexer::Lexer;
     use object::Object;
     use object::ObjectType;
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
 
     fn test_eval(input: &str) -> ObjectType {
         let program = test_setup!(input);
@@ -900,5 +916,23 @@ mod test {
 
         let input = "true && true;";
         test_bool_object(&test_eval(input), true);
+    }
+
+    #[test]
+    fn test_loop() {
+        let input = r#"
+        let a = 3;
+        let i = 0;
+        loop {
+            let a = a + 1;
+            if (i == 3) {
+              break;
+            } else {
+              let i = i + 1;
+            }
+        }
+        a;
+        "#;
+        test_integer_object(&test_eval(input), 7.0);
     }
 }

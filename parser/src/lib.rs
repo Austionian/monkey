@@ -105,6 +105,11 @@ impl<'a> Parser<'a> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
+            Token::Loop => self.parse_loop_statement(),
+            Token::Break => {
+                self.next_token();
+                Ok(Statement::BreakStatement)
+            }
             _ => self.parse_expression_statement(),
         }
     }
@@ -158,6 +163,15 @@ impl<'a> Parser<'a> {
         }
 
         Ok(BlockStatement { statements })
+    }
+
+    fn parse_loop_statement(&mut self) -> Result<Statement, String> {
+        if self.peek_token_is(&Token::Lbrace) {
+            self.next_token();
+            Ok(Statement::LoopStatement(self.parse_block_statement()?))
+        } else {
+            Err("failed to parse loop".into())
+        }
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, String> {

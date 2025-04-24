@@ -1,6 +1,6 @@
 mod builtins;
 use ast::BlockStatement;
-pub use builtins::{BUILTINS, get_builtin_by_name};
+pub use builtins::{get_builtin_by_name, BUILTINS};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -31,6 +31,7 @@ pub enum ObjectType {
     CompileFunction(Vec<u8>, usize, usize),
     // compiled function, free variables
     Closure(Box<Self>, Vec<ObjectType>),
+    Break,
 }
 
 impl ObjectType {
@@ -106,6 +107,7 @@ impl Object for ObjectType {
             Self::Closure(f, _) => {
                 format!("{f:?}")
             }
+            Self::Break => "break".to_string(),
         }
     }
 }
@@ -125,6 +127,7 @@ impl Display for ObjectType {
             Self::HashObj(_) => write!(f, "HASH"),
             Self::CompileFunction(_, _, _) => write!(f, "COMPILED FUNCTION"),
             Self::Closure(_, _) => write!(f, "CLOSURE"),
+            Self::Break => write!(f, "BREAK"),
         }
     }
 }

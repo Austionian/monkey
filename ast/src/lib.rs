@@ -14,6 +14,8 @@ pub enum Statement {
     ReturnStatement(ReturnStatement),
     ExpressStatement(Expression),
     BlockStatement(BlockStatement),
+    LoopStatement(BlockStatement),
+    BreakStatement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +138,8 @@ impl Display for Statement {
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
             Self::ExpressStatement(s) => buffer.push_str(&s.to_string()),
             Self::BlockStatement(s) => buffer.push_str(&s.to_string()),
+            Self::LoopStatement(s) => buffer.push_str(&s.to_string()),
+            Self::BreakStatement => buffer.push_str("break"),
         };
 
         write!(f, "{buffer}")

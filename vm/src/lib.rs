@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail};
 use code::{self, Op};
 use compiler::Compiler;
 use frame::Frame;
-use object::{BUILTINS, BuiltinFn, HashPair, ObjectType};
+use object::{BuiltinFn, HashPair, ObjectType, BUILTINS};
 use std::collections::HashMap;
 
 #[cfg(all(not(test), not(target_family = "wasm")))]
@@ -197,6 +197,7 @@ impl<'a> VM<'a> {
                     let current_closure = self.current_frame().cl.clone();
                     self.push(current_closure)?;
                 }
+                Op::Break | Op::Loop => todo!(),
             }
         }
 
@@ -503,11 +504,11 @@ impl<'a> VM<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use compiler::{Compiler, symbol_table::SymbolTable};
+    use compiler::{symbol_table::SymbolTable, Compiler};
     use core::panic;
     use lexer::Lexer;
     use object::{self, ObjectType};
-    use parser::{Parser, test_setup};
+    use parser::{test_setup, Parser};
     use std::{any::Any, collections::HashMap};
 
     struct VmTestCase {

@@ -49,6 +49,8 @@ pub enum Token {
     If,
     Else,
     Return,
+    Loop,
+    Break,
 }
 
 pub trait TokenLiteral {
@@ -97,6 +99,8 @@ impl TokenLiteral for Token {
             Token::Colon => ":".to_string(),
             Token::Or => "||".to_string(),
             Token::And => "&&".to_string(),
+            Token::Loop => "loop".to_string(),
+            Token::Break => "break".to_string(),
         }
     }
 }
@@ -110,6 +114,8 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
     map.insert("if", Token::If);
     map.insert("else", Token::Else);
     map.insert("return", Token::Return);
+    map.insert("loop", Token::Loop);
+    map.insert("break", Token::Break);
 
     map
 });

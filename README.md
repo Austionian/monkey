@@ -1,6 +1,8 @@
 # Monkey
 
-A Rust implementation of the [Monkey language](https://monkeylang.org/)'s interpreter and compiler. Playground [here](https://austionian.github.io/monkey/).
+A Rust implementation of the [Monkey language](https://monkeylang.org/)'s interpreter and compiler.
+
+[Playground here](https://austionian.github.io/monkey/).
 
 Added features:
 

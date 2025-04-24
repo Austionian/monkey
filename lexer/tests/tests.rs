@@ -58,6 +58,7 @@ fn test_next_token_complex() {
             {"foo": "bar"};
             true || false;
             true && false;
+            loop { break; };
             "#;
 
     let expected = vec![
@@ -157,6 +158,12 @@ fn test_next_token_complex() {
         Token::True,
         Token::And,
         Token::False,
+        Token::Semicolon,
+        Token::Loop,
+        Token::Lbrace,
+        Token::Break,
+        Token::Semicolon,
+        Token::Rbrace,
         Token::Semicolon,
         Token::Eof,
     ];

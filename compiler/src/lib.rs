@@ -13,6 +13,7 @@ pub struct Compiler<'a> {
     pub symbol_table: SymbolTable,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
+    break_position: usize,
 }
 
 pub struct Environment {
@@ -277,6 +278,23 @@ impl Compile for Statement {
             }
             Self::BlockStatement(block_statement) => block_statement.compile(compiler),
             Self::ReturnStatement(return_statement) => return_statement.compile(compiler),
+            Self::LoopStatement(block_statement) => {
+                let loop_start = compiler.current_instructions().len();
+                block_statement.compile(compiler)?;
+                compiler.emit(&Op::Jump, vec![loop_start]);
+
+                let loop_end = compiler.current_instructions().len();
+                compiler.change_operand(compiler.break_position, loop_end);
+
+                Ok(())
+            }
+            Self::BreakStatement => {
+                // set bogus for now
+                compiler.break_position = compiler.current_instructions().len();
+                compiler.emit(&Op::Jump, vec![99]);
+
+                Ok(())
+            }
         }
     }
 }
@@ -336,6 +354,7 @@ impl<'a> Compiler<'a> {
                 previous_instruction: EmittedInstruction::default(),
             }],
             scope_index: 0,
+            break_position: 0,
         }
     }
 
@@ -502,6 +521,7 @@ mod test {
         }};
 
         ($input:expr, $instructions:expr, ($($constant:expr), *)) => {{
+            #[allow(unused)]
             let mut expected_constants = Vec::<Box<dyn Any>>::new();
             $(
                 expected_constants.push(Box::new($constant));
@@ -1390,5 +1410,42 @@ mod test {
                 1.0
             )
         )]);
+    }
+
+    #[test]
+    fn test_loop_and_break() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                r#"
+                loop {
+                  break;
+                }
+            "#,
+                vec![make::it!(&Op::Jump, vec![6]), make::it!(&Op::Jump, vec![0]),],
+                ()
+            ),
+            compiler_test_case!(
+                r#"
+                    let a = 1;
+                    loop {
+                        let a = a + 2;
+                        break;
+                    }
+                "#,
+                vec![
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![1]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::SetGlobal, vec![1]),
+                    // jump out of loop
+                    make::it!(&Op::Jump, vec![22]),
+                    // jump back to loop
+                    make::it!(&Op::Jump, vec![6])
+                ],
+                (1.0, 2.0)
+            ),
+        ]);
     }
 }
