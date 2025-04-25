@@ -6,7 +6,9 @@ A Rust implementation of the [Monkey language](https://monkeylang.org/)'s interp
 
 Added features:
 
-- Support for logical operators, `&&` and `||`
+- Logical operators, `&&` and `||`
+- Loops, `loop` and `break`
+- Mutate variables, `let a = 1; a = a + 1; a;` (a is two)
 
 ## Instructions
 
