@@ -16,6 +16,7 @@ pub enum Statement {
     MutateStatement(MutateStatement),
     BlockStatement(BlockStatement),
     LoopStatement(BlockStatement),
+    PostfixStatement(PostfixStatement),
     BreakStatement,
 }
 
@@ -78,6 +79,12 @@ impl Default for Expression {
     fn default() -> Self {
         Expression::UnknownExpression(Token::default())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PostfixStatement {
+    pub name: Token,
+    pub postfix: Token,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +154,7 @@ impl Display for Statement {
             }
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
             Self::ExpressStatement(s) => buffer.push_str(&s.to_string()),
+            Self::PostfixStatement(s) => buffer.push_str(&s.to_string()),
             Self::BlockStatement(s) => buffer.push_str(&s.to_string()),
             Self::LoopStatement(s) => buffer.push_str(&s.to_string()),
             Self::BreakStatement => buffer.push_str("break"),
@@ -227,6 +235,17 @@ impl Display for Expression {
         }
 
         write!(f, "{buffer}")
+    }
+}
+
+impl Display for PostfixStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{};",
+            self.name.to_string(),
+            self.postfix.token_literal()
+        )
     }
 }
 

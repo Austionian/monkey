@@ -326,6 +326,53 @@ impl Compile for Statement {
 
                 Ok(())
             }
+            Self::PostfixStatement(postfix_statement) => {
+                let name = if let Token::Ident(name) = &postfix_statement.name {
+                    name
+                } else {
+                    return Err(CompilerError::InvalidToken(postfix_statement.name.clone()));
+                };
+
+                let symbol = compiler
+                    .symbol_table
+                    .resolve(name)
+                    .ok_or(CompilerError::UndefinedVariable)?;
+
+                // Load the variable
+                match symbol.scope {
+                    GLOBAL_SCOPE => compiler.emit(&Op::GetGlobal, vec![symbol.index]),
+                    LOCAL_SCOPE => compiler.emit(&Op::GetLocal, vec![symbol.index]),
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                        return Err(CompilerError::InvalidMutation);
+                    }
+                };
+
+                // Load in a 1
+                let i = compiler.add_constant(ObjectType::IntegerObj(1.0));
+                compiler.emit(&Op::Constant, vec![i]);
+
+                // Determine whether to add or subtract
+                match postfix_statement.postfix {
+                    Token::PlusPlus => compiler.emit(&Op::Add, vec![]),
+                    Token::MinusMinus => compiler.emit(&Op::Sub, vec![]),
+                    _ => {
+                        return Err(CompilerError::InvalidToken(
+                            postfix_statement.postfix.clone(),
+                        ));
+                    }
+                };
+
+                // Set the variable with the new value
+                match symbol.scope {
+                    GLOBAL_SCOPE => compiler.emit(&Op::SetGlobal, vec![symbol.index]),
+                    LOCAL_SCOPE => compiler.emit(&Op::SetLocal, vec![symbol.index]),
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                        return Err(CompilerError::InvalidMutation);
+                    }
+                };
+
+                Ok(())
+            }
         }
     }
 }
@@ -1476,36 +1523,6 @@ mod test {
                 ],
                 (1.0, 2.0)
             ),
-            //            compiler_test_case!(
-            //                r#"
-            //let a = 5;
-            //
-            //let i = 0;
-            //loop {
-            //  if (i == 3) {
-            //    break;
-            //  }
-            //
-            //  let a = a + 1;
-            //  let i = i + 1;
-            //}
-            //
-            //a
-            //                "#,
-            //                vec![
-            //                    make::it!(&Op::Constant, vec![0]),
-            //                    make::it!(&Op::SetGlobal, vec![0]),
-            //                    make::it!(&Op::GetGlobal, vec![1]),
-            //                    make::it!(&Op::Constant, vec![1]),
-            //                    make::it!(&Op::Add),
-            //                    make::it!(&Op::SetGlobal, vec![1]),
-            //                    // jump out of loop
-            //                    make::it!(&Op::Jump, vec![22]),
-            //                    // jump back to loop
-            //                    make::it!(&Op::Jump, vec![6])
-            //                ],
-            //                (1.0, 2.0)
-            //            ),
         ]);
     }
 
@@ -1527,5 +1544,35 @@ mod test {
             ],
             ()
         )]);
+    }
+
+    #[test]
+    fn test_postfix_operations() {
+        run_compiler_tests(vec![
+            compiler_test_case!(
+                "let a = 1; a++;",
+                vec![
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Add),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                ],
+                (1.0, 1.0)
+            ),
+            compiler_test_case!(
+                "let a = 1; a--;",
+                vec![
+                    make::it!(&Op::Constant, vec![0]),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                    make::it!(&Op::GetGlobal, vec![0]),
+                    make::it!(&Op::Constant, vec![1]),
+                    make::it!(&Op::Sub),
+                    make::it!(&Op::SetGlobal, vec![0]),
+                ],
+                (1.0, 1.0)
+            ),
+        ]);
     }
 }

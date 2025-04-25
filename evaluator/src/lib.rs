@@ -1,5 +1,5 @@
 mod builtins;
-use ast::{BlockStatement, Expression, Map, MutateStatement, Program, Statement};
+use ast::{BlockStatement, Expression, Map, MutateStatement, PostfixStatement, Program, Statement};
 use builtins::BUILTINS;
 use object::{Environment, Function, HashPair, Object, ObjectType};
 use std::collections::HashMap;
@@ -57,7 +57,42 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
         Statement::MutateStatement(mutate_statement) => {
             eval_mutate_statement(mutate_statement, env)
         }
+        Statement::PostfixStatement(postfix_statement) => {
+            eval_postfix_statement(postfix_statement, env)
+        }
     }
+}
+
+fn eval_postfix_statement(statement: &PostfixStatement, env: &mut Environment) -> ObjectType {
+    let obj = match env.get(&statement.name.token_literal()) {
+        Some(obj) => obj,
+        None => return ObjectType::ErrorObj(format!("Uninitated variable: {}", statement.name)),
+    };
+
+    if let ObjectType::IntegerObj(value) = obj {
+        match statement.postfix {
+            Token::PlusPlus => {
+                env.set(
+                    &statement.name.token_literal(),
+                    ObjectType::IntegerObj(value + 1.0),
+                );
+            }
+            Token::MinusMinus => {
+                env.set(
+                    &statement.name.token_literal(),
+                    ObjectType::IntegerObj(value - 1.0),
+                );
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        return ObjectType::ErrorObj(format!(
+            "Invalid postfix operation, expected: INTEGER, got: {}",
+            obj.r#type()
+        ));
+    }
+
+    ObjectType::default()
 }
 
 fn eval_mutate_statement(statement: &MutateStatement, env: &mut Environment) -> ObjectType {
@@ -152,7 +187,10 @@ fn eval_expression(expression: &Expression, env: &mut Environment) -> ObjectType
             eval_index_expression(left, index)
         }
         Expression::HashLiteral(map) => eval_hash_literal_node(map, env),
-        _ => todo!(),
+        Expression::UnknownExpression(token) => ObjectType::ErrorObj(format!(
+            "Encounted unknown token: {}",
+            token.token_literal()
+        )),
     }
 }
 

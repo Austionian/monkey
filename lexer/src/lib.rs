@@ -66,6 +66,7 @@ impl<'a> Lexer<'a> {
 
     pub fn next_token(&mut self) -> Token {
         self.skip_white_space();
+        self.skip_comments();
 
         let tok = match self.ch as char {
             '=' => {
@@ -100,8 +101,22 @@ impl<'a> Lexer<'a> {
             '[' => Token::Lbracket,
             ']' => Token::Rbracket,
             ',' => Token::Comma,
-            '+' => Token::Plus,
-            '-' => Token::Minus,
+            '+' => {
+                if self.peek_char() == b'+' {
+                    self.read_char();
+                    Token::PlusPlus
+                } else {
+                    Token::Plus
+                }
+            }
+            '-' => {
+                if self.peek_char() == b'-' {
+                    self.read_char();
+                    Token::MinusMinus
+                } else {
+                    Token::Minus
+                }
+            }
             '!' => {
                 if self.peek_char() == b'=' {
                     self.read_char();
@@ -161,6 +176,19 @@ impl<'a> Lexer<'a> {
     fn skip_white_space(&mut self) {
         while self.ch == b' ' || self.ch == b'\t' || self.ch == b'\n' || self.ch == b'\r' {
             self.read_char();
+        }
+    }
+
+    fn skip_comments(&mut self) {
+        if self.ch as char == '/' && self.peek_char() == b'/' {
+            while !(self.ch == b'\n' || self.ch == b'\r') {
+                self.read_char();
+            }
+            // read the \n or \r
+            self.read_char();
+            self.skip_comments();
+        } else {
+            return;
         }
     }
 

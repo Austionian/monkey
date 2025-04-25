@@ -5,6 +5,57 @@ use parser::*;
 use std::collections::HashMap;
 use token::{Token, TokenLiteral};
 
+fn test_ident_expression(expression: &Expression, expected_token: &str) {
+    match expression {
+        Expression::IdentExpression(t) => {
+            assert_eq!(t.token_literal(), expected_token);
+        }
+        _ => panic!("Expected ident expression"),
+    }
+}
+
+fn test_int_expression(expression: &Expression, expected_token: usize) {
+    match expression {
+        Expression::IntExpression(t) => {
+            assert_eq!(t.token_literal().parse::<usize>().unwrap(), expected_token);
+        }
+        _ => panic!("Expected int expression"),
+    }
+}
+
+fn test_infix_expression(
+    expression: &Expression,
+    expected_token: &str,
+    left_literal: &str,
+    right_literal: &str,
+) {
+    match expression {
+        Expression::InfixExpression((t, left, right)) => {
+            assert_eq!(t.token_literal(), expected_token);
+            match **left {
+                Expression::IdentExpression(ref t) => {
+                    assert_eq!(t.token_literal(), left_literal)
+                }
+                Expression::IntExpression(ref t) => {
+                    assert_eq!(t.token_literal(), left_literal)
+                }
+                _ => panic!("Expected ident | int expression"),
+            }
+
+            match **right {
+                Expression::IdentExpression(ref t) => {
+                    assert_eq!(t.token_literal(), right_literal)
+                }
+                Expression::IntExpression(ref t) => {
+                    assert_eq!(t.token_literal(), right_literal)
+                }
+                _ => panic!("Expected ident | int expression"),
+            }
+        }
+        _ => panic!("Expected infix expression"),
+    }
+}
+
 fn test_statement(statement: &Statement, name: &str) -> bool {
     match statement {
         Statement::LetStatement(statement) => {
@@ -684,53 +735,37 @@ fn test_assign_without_let() {
     }
 }
 
-fn test_ident_expression(expression: &Expression, expected_token: &str) {
-    match expression {
-        Expression::IdentExpression(t) => {
-            assert_eq!(t.token_literal(), expected_token);
-        }
-        _ => panic!("Expected ident expression"),
-    }
-}
+#[test]
+fn test_postfix_operators() {
+    let input = "a++";
+    let program = test_setup!(input);
 
-fn test_int_expression(expression: &Expression, expected_token: usize) {
-    match expression {
-        Expression::IntExpression(t) => {
-            assert_eq!(t.token_literal().parse::<usize>().unwrap(), expected_token);
-        }
-        _ => panic!("Expected int expression"),
-    }
-}
+    assert_eq!(program.statements.len(), 1);
 
-fn test_infix_expression(
-    expression: &Expression,
-    expected_token: &str,
-    left_literal: &str,
-    right_literal: &str,
-) {
-    match expression {
-        Expression::InfixExpression((t, left, right)) => {
-            assert_eq!(t.token_literal(), expected_token);
-            match **left {
-                Expression::IdentExpression(ref t) => {
-                    assert_eq!(t.token_literal(), left_literal)
-                }
-                Expression::IntExpression(ref t) => {
-                    assert_eq!(t.token_literal(), left_literal)
-                }
-                _ => panic!("Expected ident | int expression"),
+    match &program.statements[0] {
+        Statement::PostfixStatement(PostfixStatement { name, postfix }) => {
+            match name {
+                Token::Ident(name) => assert_eq!(name, "a"),
+                _ => panic!("expected ident expression"),
             }
-
-            match **right {
-                Expression::IdentExpression(ref t) => {
-                    assert_eq!(t.token_literal(), right_literal)
-                }
-                Expression::IntExpression(ref t) => {
-                    assert_eq!(t.token_literal(), right_literal)
-                }
-                _ => panic!("Expected ident | int expression"),
-            }
+            assert_eq!(*postfix, Token::PlusPlus);
         }
-        _ => panic!("Expected infix expression"),
+        _ => panic!("expected prefix expression"),
+    }
+
+    let input = "a--";
+    let program = test_setup!(input);
+
+    assert_eq!(program.statements.len(), 1);
+
+    match &program.statements[0] {
+        Statement::PostfixStatement(PostfixStatement { name, postfix }) => {
+            match name {
+                Token::Ident(name) => assert_eq!(name, "a"),
+                _ => panic!("expected ident expression"),
+            }
+            assert_eq!(*postfix, Token::MinusMinus);
+        }
+        _ => panic!("expected prefix expression"),
     }
 }

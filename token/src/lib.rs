@@ -25,8 +25,13 @@ pub enum Token {
     Eq,
     Not_eq,
 
+    // Logical Operators
     Or,
     And,
+
+    // Postfix Operators
+    PlusPlus,
+    MinusMinus,
 
     // Delimiters
     Comma,
@@ -101,6 +106,8 @@ impl TokenLiteral for Token {
             Token::And => "&&".to_string(),
             Token::Loop => "loop".to_string(),
             Token::Break => "break".to_string(),
+            Token::PlusPlus => "++".to_string(),
+            Token::MinusMinus => "--".to_string(),
         }
     }
 }

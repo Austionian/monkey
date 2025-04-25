@@ -1,3 +1,4 @@
+// Dynamically compute the nth fibonacci number.
 let fibonacci = fn(n) {
   let bottom_up = [0, 1, 1];
 
@@ -9,7 +10,7 @@ let fibonacci = fn(n) {
 
     bottom_up = push(bottom_up, bottom_up[i - 2] + bottom_up[i - 1]);
 
-    i = i + 1;
+    i++;
   }
 
   last(bottom_up);

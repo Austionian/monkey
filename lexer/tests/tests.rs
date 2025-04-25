@@ -59,6 +59,8 @@ fn test_next_token_complex() {
             true || false;
             true && false;
             loop { break; };
+            a++;
+            b--;
             "#;
 
     let expected = vec![
@@ -164,6 +166,12 @@ fn test_next_token_complex() {
         Token::Break,
         Token::Semicolon,
         Token::Rbrace,
+        Token::Semicolon,
+        Token::Ident("a".to_string()),
+        Token::PlusPlus,
+        Token::Semicolon,
+        Token::Ident("b".to_string()),
+        Token::MinusMinus,
         Token::Semicolon,
         Token::Eof,
     ];

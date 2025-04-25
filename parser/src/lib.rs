@@ -1,6 +1,6 @@
 use ast::{
-    BlockStatement, Expression, LetStatement, Map, MutateStatement, Program, ReturnStatement,
-    Statement,
+    BlockStatement, Expression, LetStatement, Map, MutateStatement, PostfixStatement, Program,
+    ReturnStatement, Statement,
 };
 use lexer::Lexer;
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc, sync::LazyLock};
@@ -110,8 +110,29 @@ impl<'a> Parser<'a> {
                 Ok(Statement::BreakStatement)
             }
             Token::Ident(_) if self.peek_token_is(&Token::Assign) => self.parse_mutate_statement(),
+            Token::Ident(_)
+                if self.peek_token_is(&Token::PlusPlus)
+                    || self.peek_token_is(&Token::MinusMinus) =>
+            {
+                self.parse_postfix_statement()
+            }
             _ => self.parse_expression_statement(),
         }
+    }
+
+    fn parse_postfix_statement(&mut self) -> Result<Statement, String> {
+        let name = self.cur_token.clone();
+        self.next_token();
+        let postfix = self.cur_token.clone();
+
+        if self.peek_token_is(&Token::Semicolon) {
+            self.next_token();
+        }
+
+        Ok(Statement::PostfixStatement(PostfixStatement {
+            name,
+            postfix,
+        }))
     }
 
     fn parse_mutate_statement(&mut self) -> Result<Statement, String> {

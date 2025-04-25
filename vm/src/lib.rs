@@ -1246,4 +1246,12 @@ mod test {
             vm_test_case!("let a = 5; let b = 6; a = b + 1; a;", 7.0),
         ]);
     }
+
+    #[test]
+    fn test_postfix() {
+        run_vm_tests(vec![
+            vm_test_case!("let a = 5; a++;", 6.0),
+            vm_test_case!("let a = 5; a--;", 4.0),
+        ]);
+    }
 }

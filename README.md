@@ -2,13 +2,15 @@
 
 A Rust implementation of the [Monkey language](https://monkeylang.org/)'s interpreter and compiler.
 
-[Playground here](https://austionian.github.io/monkey/).
+### [Playground](https://austionian.github.io/monkey/)
 
 Added features:
 
 - Logical operators, `&&` and `||`
 - Loops, `loop` and `break`
-- Mutate variables, `let a = 1; a = a + 1; a;` (a is two)
+- Mutate variables, `let foo = 1; foo = foo + 1; foo;` // 2
+- Postfix operators on variables, `foo++;` and `bar--;`
+- Comments `// This is a comment`
 
 ## Instructions
 

@@ -47,10 +47,12 @@ fn main() {
         },
         None => match args.mode.unwrap_or_default() {
             Mode::Compile => start(),
-            Mode::Eval => loop {
+            Mode::Eval => {
                 let mut env = Environment::new();
-                repl::repl_start(&mut env);
-            },
+                loop {
+                    repl::repl_start(&mut env);
+                }
+            }
         },
     }
 }
