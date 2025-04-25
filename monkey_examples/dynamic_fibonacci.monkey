@@ -7,9 +7,7 @@ let fibonacci = fn(n) {
       break;
     }
 
-    let a = bottom_up[i - 2];
-    let b = bottom_up[i - 1];
-    bottom_up = push(bottom_up, a + b);
+    bottom_up = push(bottom_up, bottom_up[i - 2] + bottom_up[i - 1]);
 
     i = i + 1;
   }
