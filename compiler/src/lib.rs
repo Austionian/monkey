@@ -13,7 +13,7 @@ pub struct Compiler<'a> {
     pub symbol_table: SymbolTable,
     scopes: Vec<CompilationScope>,
     scope_index: usize,
-    break_position: usize,
+    break_position: Vec<usize>,
 }
 
 pub struct Environment {
@@ -61,6 +61,8 @@ pub enum CompilerError {
     UndefinedVariable,
     #[error("invalid token {0:?}")]
     InvalidToken(Token),
+    #[error("can't mutate a non variable")]
+    InvalidMutation,
 }
 
 pub trait Compile {
@@ -155,6 +157,7 @@ impl Compile for Expression {
                 } else {
                     return Err(CompilerError::InvalidToken(ident.clone()));
                 };
+
                 let symbol = compiler
                     .symbol_table
                     .resolve(name)
@@ -284,14 +287,42 @@ impl Compile for Statement {
                 compiler.emit(&Op::Jump, vec![loop_start]);
 
                 let loop_end = compiler.current_instructions().len();
-                compiler.change_operand(compiler.break_position, loop_end);
+                let break_position = compiler
+                    .break_position
+                    .pop()
+                    .ok_or(CompilerError::UndefinedVariable)?;
+                compiler.change_operand(break_position, loop_end);
 
                 Ok(())
             }
             Self::BreakStatement => {
-                // set bogus for now
-                compiler.break_position = compiler.current_instructions().len();
-                compiler.emit(&Op::Jump, vec![99]);
+                // set bogus for now and commit its position for later
+                let break_position = compiler.emit(&Op::Jump, vec![99]);
+                compiler.break_position.push(break_position);
+
+                Ok(())
+            }
+            Self::MutateStatement(mutate_statement) => {
+                let name = if let Token::Ident(name) = &mutate_statement.name {
+                    name
+                } else {
+                    return Err(CompilerError::InvalidToken(mutate_statement.name.clone()));
+                };
+
+                let symbol = compiler
+                    .symbol_table
+                    .resolve(name)
+                    .ok_or(CompilerError::UndefinedVariable)?;
+
+                mutate_statement.value.compile(compiler)?;
+
+                match symbol.scope {
+                    GLOBAL_SCOPE => compiler.emit(&Op::SetGlobal, vec![symbol.index]),
+                    LOCAL_SCOPE => compiler.emit(&Op::SetLocal, vec![symbol.index]),
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                        return Err(CompilerError::InvalidMutation);
+                    }
+                };
 
                 Ok(())
             }
@@ -354,7 +385,7 @@ impl<'a> Compiler<'a> {
                 previous_instruction: EmittedInstruction::default(),
             }],
             scope_index: 0,
-            break_position: 0,
+            break_position: Vec::new(),
         }
     }
 
@@ -591,7 +622,6 @@ mod test {
             }
             if constant.is::<Vec<Instructions>>() {
                 let expected = *constant.downcast::<Vec<Instructions>>().unwrap();
-                println!("exp --- {expected:?}");
                 if let ObjectType::CompileFunction(ins, _, _) = &actual[i] {
                     test_instructions(expected, ins);
                     continue;
@@ -1446,6 +1476,56 @@ mod test {
                 ],
                 (1.0, 2.0)
             ),
+            //            compiler_test_case!(
+            //                r#"
+            //let a = 5;
+            //
+            //let i = 0;
+            //loop {
+            //  if (i == 3) {
+            //    break;
+            //  }
+            //
+            //  let a = a + 1;
+            //  let i = i + 1;
+            //}
+            //
+            //a
+            //                "#,
+            //                vec![
+            //                    make::it!(&Op::Constant, vec![0]),
+            //                    make::it!(&Op::SetGlobal, vec![0]),
+            //                    make::it!(&Op::GetGlobal, vec![1]),
+            //                    make::it!(&Op::Constant, vec![1]),
+            //                    make::it!(&Op::Add),
+            //                    make::it!(&Op::SetGlobal, vec![1]),
+            //                    // jump out of loop
+            //                    make::it!(&Op::Jump, vec![22]),
+            //                    // jump back to loop
+            //                    make::it!(&Op::Jump, vec![6])
+            //                ],
+            //                (1.0, 2.0)
+            //            ),
         ]);
+    }
+
+    #[test]
+    fn test_nested_loops() {
+        run_compiler_tests(vec![compiler_test_case!(
+            "loop { loop { break; } break; }",
+            // this would be clearer with more happening inside the loops
+            // 0000 OpJump 6\n0003 OpJump 0\n0006 OpJump 12\n0009 OpJump 0\n
+            vec![
+                // break out of inner loop
+                make::it!(&Op::Jump, vec![6]),
+                // start back at start of inner loop
+                make::it!(&Op::Jump, vec![0]),
+                // break out of outer loop
+                make::it!(&Op::Jump, vec![12]),
+                // start back at start of outer loop
+                make::it!(&Op::Jump, vec![0])
+            ],
+            ()
+        )]);
     }
 }

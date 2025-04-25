@@ -1,4 +1,7 @@
-use ast::{BlockStatement, Expression, LetStatement, Map, Program, ReturnStatement, Statement};
+use ast::{
+    BlockStatement, Expression, LetStatement, Map, MutateStatement, Program, ReturnStatement,
+    Statement,
+};
 use lexer::Lexer;
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc, sync::LazyLock};
 use token::Token;
@@ -90,11 +93,7 @@ impl<'a> Parser<'a> {
         };
 
         while self.cur_token != Token::Eof {
-            let statement = self.parse_statement();
-            match statement {
-                Ok(statement) => program.statements.push(statement),
-                Err(e) => return Err(e),
-            }
+            program.statements.push(self.parse_statement()?);
             self.next_token();
         }
 
@@ -102,7 +101,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
-        match self.cur_token {
+        match &self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
             Token::Loop => self.parse_loop_statement(),
@@ -110,8 +109,37 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 Ok(Statement::BreakStatement)
             }
+            Token::Ident(_) if self.peek_token_is(&Token::Assign) => self.parse_mutate_statement(),
             _ => self.parse_expression_statement(),
         }
+    }
+
+    fn parse_mutate_statement(&mut self) -> Result<Statement, String> {
+        let mut statement = MutateStatement {
+            name: self.cur_token.clone(),
+            value: Expression::default(),
+        };
+
+        if !self.expect_peek(&Token::Assign) {
+            return Err("Failed to parse mutate statement, expected an assignment".to_string());
+        }
+
+        self.next_token();
+
+        statement.value = self
+            .parse_expression(ExpressionPrecendence::Lowest)
+            .ok_or("failed to parse expression")?;
+
+        if let Expression::FunctionLiteral(_, _, _, ref rc) = statement.value {
+            let mut name = rc.borrow_mut();
+            *name = Some(statement.name.to_string());
+        }
+
+        if self.peek_token_is(&Token::Semicolon) {
+            self.next_token();
+        }
+
+        Ok(Statement::MutateStatement(statement))
     }
 
     pub fn parse_expression(&mut self, precendence: ExpressionPrecendence) -> Option<Expression> {
@@ -280,6 +308,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // TODO: Just return the Result rather than a bool
     pub fn expect_peek(&mut self, token: &Token) -> bool {
         if self.peek_token_is(token) {
             self.next_token();

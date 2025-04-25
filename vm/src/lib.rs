@@ -68,9 +68,7 @@ impl<'a> VM<'a> {
 
                     self.push(self.constants[const_index as usize].clone())?;
                 }
-                Op::Add | code::Op::Sub | code::Op::Mul | code::Op::Div => {
-                    self.execute_binary_operation(&op)?
-                }
+                Op::Add | Op::Sub | Op::Mul | Op::Div => self.execute_binary_operation(&op)?,
                 Op::Pop => {
                     self.pop();
                 }
@@ -197,7 +195,6 @@ impl<'a> VM<'a> {
                     let current_closure = self.current_frame().cl.clone();
                     self.push(current_closure)?;
                 }
-                Op::Break | Op::Loop => todo!(),
             }
         }
 
@@ -1239,6 +1236,14 @@ mod test {
             vm_test_case!("true && 0", false),
             vm_test_case!("45 && 1", true),
             vm_test_case!("0 && 5", false),
+        ]);
+    }
+
+    #[test]
+    fn test_mutation() {
+        run_vm_tests(vec![
+            vm_test_case!("let a = 5; a = a + 5; a;", 10.0),
+            vm_test_case!("let a = 5; let b = 6; a = b + 1; a;", 7.0),
         ]);
     }
 }

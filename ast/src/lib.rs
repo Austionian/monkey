@@ -13,6 +13,7 @@ pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
     ExpressStatement(Expression),
+    MutateStatement(MutateStatement),
     BlockStatement(BlockStatement),
     LoopStatement(BlockStatement),
     BreakStatement,
@@ -80,6 +81,12 @@ impl Default for Expression {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutateStatement {
+    pub name: Token,
+    pub value: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Token,
@@ -134,6 +141,9 @@ impl Display for Statement {
                     s.name.token_literal(),
                     s.value
                 ));
+            }
+            Self::MutateStatement(s) => {
+                buffer.push_str(&format!("{} = {};", s.name.token_literal(), s.value));
             }
             Self::ReturnStatement(s) => buffer.push_str(&s.to_string()),
             Self::ExpressStatement(s) => buffer.push_str(&s.to_string()),

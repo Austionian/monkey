@@ -50,9 +50,6 @@ pub enum Op {
 
     Closure,
     CurrentClosure,
-
-    Loop,
-    Break,
 }
 
 impl From<Op> for u8 {
@@ -103,8 +100,6 @@ impl Display for Op {
             Self::CurrentClosure => write!(f, "OpCurrentClosure"),
             Self::Or => write!(f, "OpOr"),
             Self::And => write!(f, "OpAnd"),
-            Self::Loop => write!(f, "OpLoop"),
-            Self::Break => write!(f, "OpBreak"),
         }
     }
 }
@@ -130,8 +125,6 @@ impl Op {
             | Self::CurrentClosure
             | Self::Or
             | Self::And
-            | Self::Loop
-            | Self::Break
             | Self::Null => vec![],
 
             Self::GetLocal | Self::SetLocal | Self::Call | Self::GetBuiltin | Self::GetFree => {

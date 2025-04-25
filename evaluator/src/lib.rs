@@ -1,5 +1,5 @@
 mod builtins;
-use ast::{BlockStatement, Expression, Map, Program, Statement};
+use ast::{BlockStatement, Expression, Map, MutateStatement, Program, Statement};
 use builtins::BUILTINS;
 use object::{Environment, Function, HashPair, Object, ObjectType};
 use std::collections::HashMap;
@@ -54,7 +54,22 @@ pub fn eval(node: &Statement, env: &mut Environment) -> ObjectType {
         Statement::BlockStatement(block_statement) => eval_block_statements(block_statement, env),
         Statement::LoopStatement(block_statement) => eval_loop_statement(block_statement, env),
         Statement::BreakStatement => ObjectType::Break,
+        Statement::MutateStatement(mutate_statement) => {
+            eval_mutate_statement(mutate_statement, env)
+        }
     }
+}
+
+fn eval_mutate_statement(statement: &MutateStatement, env: &mut Environment) -> ObjectType {
+    match env.get(&statement.name.token_literal()) {
+        Some(_) => {}
+        None => return ObjectType::ErrorObj(format!("Uninitated variable: {}", statement.name)),
+    }
+
+    let value = eval_expression(&statement.value, env);
+    env.set(&statement.name.token_literal(), value);
+
+    ObjectType::default()
 }
 
 fn eval_loop_statement(block: &BlockStatement, env: &mut Environment) -> ObjectType {
@@ -930,5 +945,11 @@ mod test {
         a;
         "#;
         test_integer_object(&test_eval(input), 7.0);
+    }
+
+    #[test]
+    fn test_mutate() {
+        let input = "let a = 5; a = a + 1; a;";
+        test_integer_object(&test_eval(input), 6.0);
     }
 }

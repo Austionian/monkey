@@ -649,6 +649,41 @@ fn test_loop() {
     }
 }
 
+#[test]
+fn test_assign_without_let() {
+    let input = "a = 6;";
+    let program = test_setup!(input);
+
+    assert_eq!(program.statements.len(), 1);
+
+    match &program.statements[0] {
+        Statement::MutateStatement(MutateStatement { name, value }) => {
+            assert_eq!(name, &Token::Ident("a".into()));
+            match value {
+                Expression::IntExpression(Token::Int(value)) => assert_eq!(*value, 6),
+                _ => panic!("expected int expression"),
+            }
+        }
+        _ => panic!("expected mutate statement"),
+    }
+
+    let input = "let a = 5; a = 6;";
+    let program = test_setup!(input);
+
+    assert_eq!(program.statements.len(), 2);
+
+    match &program.statements[1] {
+        Statement::MutateStatement(MutateStatement { name, value }) => {
+            assert_eq!(name, &Token::Ident("a".into()));
+            match value {
+                Expression::IntExpression(Token::Int(value)) => assert_eq!(*value, 6),
+                _ => panic!("expected int expression"),
+            }
+        }
+        _ => panic!("expected mutate statement"),
+    }
+}
+
 fn test_ident_expression(expression: &Expression, expected_token: &str) {
     match expression {
         Expression::IdentExpression(t) => {
