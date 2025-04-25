@@ -8,7 +8,6 @@ use vm::GLOBAL_SIZE;
 #[clap(rename_all = "kebab_case")]
 enum Mode {
     #[default]
-    Repl,
     Compile,
     Eval,
 }
@@ -16,49 +15,43 @@ enum Mode {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Optional mode to run in, default to repl
-    mode: Option<Mode>,
-
-    /// Optional path to file to be run
-    #[arg(long)]
+    /// Optional path to file to be run, running without will start the repl
     path: Option<PathBuf>,
+
+    #[arg(long)]
+    /// Optional mode to run in, defaults to compile
+    mode: Option<Mode>,
 }
 
 fn main() {
     let args = Args::parse();
-    match args.mode.unwrap_or(Mode::Repl) {
-        Mode::Repl | Mode::Compile => {
-            if args.path.is_some() {
-                match std::fs::read_to_string(args.path.unwrap()) {
-                    Ok(file) => {
-                        let mut constants = Vec::new();
-                        let symbol_table = SymbolTable::new();
-                        let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
+    match args.path {
+        Some(path) => match args.mode.unwrap_or_default() {
+            Mode::Compile => match std::fs::read_to_string(path) {
+                Ok(file) => {
+                    let mut constants = Vec::new();
+                    let symbol_table = SymbolTable::new();
+                    let mut globals = [const { ObjectType::NullObj }; GLOBAL_SIZE];
 
-                        repl::compile(&mut constants, symbol_table, &mut globals, &file);
-                    }
-                    Err(_) => eprintln!("no such file"),
+                    repl::compile(&mut constants, symbol_table, &mut globals, &file);
                 }
-            } else {
-                start();
-            }
-        }
-        Mode::Eval => {
-            if args.path.is_some() {
-                match std::fs::read_to_string(args.path.unwrap()) {
-                    Ok(file) => {
-                        let mut env = Environment::new();
-                        repl::eval(&mut env, &file);
-                    }
-                    Err(_) => eprintln!("no such file"),
-                }
-            } else {
-                loop {
+                Err(_) => eprintln!("no such file"),
+            },
+            Mode::Eval => match std::fs::read_to_string(path) {
+                Ok(file) => {
                     let mut env = Environment::new();
-                    repl::repl_start(&mut env);
+                    repl::eval(&mut env, &file);
                 }
-            }
-        }
+                Err(_) => eprintln!("no such file"),
+            },
+        },
+        None => match args.mode.unwrap_or_default() {
+            Mode::Compile => start(),
+            Mode::Eval => loop {
+                let mut env = Environment::new();
+                repl::repl_start(&mut env);
+            },
+        },
     }
 }
 

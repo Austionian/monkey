@@ -25,13 +25,19 @@ To start the repl using the compiler/vm:
 To start the repl using the interpreter:
 
 ```
-./target/release/repl eval
+./target/release/repl --mode eval
 ```
 
-To execute a `.monkey` file, pass a `--path`
+To execute a `.monkey` file with the compiler/vm:
 
 ```
-./target/release/repl --path monkey_examples/fibonacci.monkey
+./target/release/repl monkey_examples/fibonacci.monkey
+```
+
+To execute a `.monkey` file with the interpreter:
+
+```
+./target/release/repl monkey_examples/fibonacci.monkey --mode eval
 ```
 
 ## Benchmark between compiler and interpreter:
