@@ -184,11 +184,8 @@ impl<'a> Lexer<'a> {
             while !(self.ch == b'\n' || self.ch == b'\r') {
                 self.read_char();
             }
-            // read the \n or \r
-            self.read_char();
+            self.skip_white_space();
             self.skip_comments();
-        } else {
-            return;
         }
     }
 

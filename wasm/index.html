@@ -31,7 +31,10 @@
       </div>
     </header>
     <main class="flex flex-col mx-6 gap-8">
-      <textarea id="i" class="textarea w-full h-96 font-mono">
+      <div>
+        <button id="btn" class="btn btn-primary">run</button>
+      </div>
+      <textarea id="input" autofocus class="textarea w-full h-96 font-mono">
 let main = fn() {
   let a = "hello world!";
 
@@ -40,13 +43,10 @@ let main = fn() {
 
 main();</textarea
       >
-      <div>
-        <button id="btn" class="btn btn-primary">run</button>
-      </div>
-      <h2 class="text-xl mt-6">Output:</h2>
       <div class="w-full h-36 p-6 bg-black/20 ring-1 ring-white/10 rounded-md">
         <div id="output" class="font-mono"></div>
       </div>
+      <div id="executionTime"></div>
     </main>
     <footer
       class="footer footer-horizontal footer-center bg-base-200 text-base-content p-10 absolute bottom-0"

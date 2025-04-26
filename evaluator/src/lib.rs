@@ -243,7 +243,7 @@ fn eval_hash_index_expression(map: &HashMap<u64, HashPair>, index: ObjectType) -
     }
 }
 
-fn eval_array_index_expression(array: &Vec<ObjectType>, index: f64) -> ObjectType {
+fn eval_array_index_expression(array: &[ObjectType], index: f64) -> ObjectType {
     if index < 0.0 || index > array.len() as f64 - 1.0 {
         return NULL;
     }

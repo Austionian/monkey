@@ -39,12 +39,12 @@ pub fn execute(buffer: &str) -> String {
     if let Ok(program) = program {
         let mut comp = Compiler::new(&mut constants, symbol_table);
         if let Err(e) = comp.compile(program) {
-            return format!("woops! compilation failed: {e:?}");
+            return format!("whoops! compilation failed - {e:?}");
         }
 
         let mut machine = VM::new(comp, &mut globals);
         if let Err(e) = machine.run() {
-            return format!("whoops! executing the bytecode failed:, {e}");
+            return format!("whoops! executing the bytecode failed - {e}");
         }
 
         let stack_top = machine.last_popped_stack_elem();

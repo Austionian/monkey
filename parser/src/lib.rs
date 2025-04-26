@@ -528,6 +528,7 @@ fn parse_index_expression(p: &mut Parser, left: Expression) -> Expression {
 }
 
 fn parse_hash_literal(p: &mut Parser) -> Option<Expression> {
+    #[allow(clippy::mutable_key_type)]
     let mut pairs = HashMap::new();
 
     while !p.peek_token_is(&Token::Rbrace) {

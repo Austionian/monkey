@@ -399,7 +399,7 @@ impl<'a> VM<'a> {
             Op::And => self.push(ObjectType::BoolObj(
                 right.to_native_bool() && left.to_native_bool(),
             )),
-            _ => bail!("unknown operator: {}", op),
+            _ => bail!("unexpected operator: {}", op),
         }
     }
 
@@ -410,7 +410,7 @@ impl<'a> VM<'a> {
             Op::NotEqual => self.push(ObjectType::BoolObj(left != right)),
             Op::Or => self.push(ObjectType::BoolObj((left != 0.0) || (right != 0.0))),
             Op::And => self.push(ObjectType::BoolObj((left != 0.0) && (right != 0.0))),
-            _ => bail!("unknown operator: {}", op),
+            _ => bail!("unexpected operator: {}", op),
         }
     }
 
@@ -423,13 +423,13 @@ impl<'a> VM<'a> {
                 ObjectType::IntegerObj(right) => {
                     self.execute_binary_int_operation(op, left, right)?;
                 }
-                _ => bail!("unexpected operation: {} {} {}", left, op, right),
+                _ => bail!("unexpected operation: INTEGER {} {}", op, right),
             },
             ObjectType::StringObj(left) => match right {
                 ObjectType::StringObj(right) => {
                     self.execute_string_operation(op, left, right)?;
                 }
-                _ => bail!("unexpected operation: {} {} {}", left, op, right),
+                _ => bail!("unexpected operation: STRING {} {}", op, right),
             },
             _ => bail!("unexpected operation: {} {} {}", left, op, right),
         }
@@ -448,7 +448,7 @@ impl<'a> VM<'a> {
                 left.push_str(&right);
                 self.push(ObjectType::StringObj(left))
             }
-            _ => bail!("Unsupported string operator: {}", op),
+            _ => bail!("unsupported string operator: {}", op),
         }
     }
 

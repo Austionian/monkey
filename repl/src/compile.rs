@@ -26,7 +26,7 @@ pub fn compile(
         let symbols = comp.symbol_table.clone();
         let mut machine = VM::new(comp, globals);
         if let Err(e) = machine.run() {
-            eprintln!("whoops! executing the bytecode failed:, {e}");
+            eprintln!("whoops! executing the bytecode failed - {e}");
         }
 
         let stack_top = machine.last_popped_stack_elem();

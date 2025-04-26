@@ -319,9 +319,10 @@ impl Compile for Statement {
                 match symbol.scope {
                     GLOBAL_SCOPE => compiler.emit(&Op::SetGlobal, vec![symbol.index]),
                     LOCAL_SCOPE => compiler.emit(&Op::SetLocal, vec![symbol.index]),
-                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE => {
                         return Err(CompilerError::InvalidMutation);
                     }
+                    _ => return Err(CompilerError::UndefinedVariable),
                 };
 
                 Ok(())
@@ -342,9 +343,10 @@ impl Compile for Statement {
                 match symbol.scope {
                     GLOBAL_SCOPE => compiler.emit(&Op::GetGlobal, vec![symbol.index]),
                     LOCAL_SCOPE => compiler.emit(&Op::GetLocal, vec![symbol.index]),
-                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE => {
                         return Err(CompilerError::InvalidMutation);
                     }
+                    _ => return Err(CompilerError::UndefinedVariable),
                 };
 
                 // Load in a 1
@@ -366,9 +368,10 @@ impl Compile for Statement {
                 match symbol.scope {
                     GLOBAL_SCOPE => compiler.emit(&Op::SetGlobal, vec![symbol.index]),
                     LOCAL_SCOPE => compiler.emit(&Op::SetLocal, vec![symbol.index]),
-                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE | _ => {
+                    FREE_SCOPE | FUNCTION_SCOPE | BUILTIN_SCOPE => {
                         return Err(CompilerError::InvalidMutation);
                     }
+                    _ => return Err(CompilerError::UndefinedVariable),
                 };
 
                 Ok(())

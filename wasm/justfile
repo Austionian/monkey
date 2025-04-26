@@ -20,4 +20,4 @@ build:
 # Run the vite server
 dev:
   #!/bin/bash
-  npm run dev
+  just build-wasm && npm run dev
