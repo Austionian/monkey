@@ -255,7 +255,7 @@ impl<'a> VM<'a> {
                 unreachable!("only compiled functions are in closures")
             }
         } else {
-            todo!()
+            bail!("unexpected callee: {}", callee)
         }
     }
 
@@ -366,7 +366,7 @@ impl<'a> VM<'a> {
         if let ObjectType::IntegerObj(value) = operand {
             self.push(ObjectType::IntegerObj(-value))
         } else {
-            anyhow::bail!("Unsupported type for negation: {}", operand)
+            bail!("Unsupported type for negation: {}", operand)
         }
     }
 
@@ -399,7 +399,7 @@ impl<'a> VM<'a> {
             Op::And => self.push(ObjectType::BoolObj(
                 right.to_native_bool() && left.to_native_bool(),
             )),
-            _ => anyhow::bail!("Unknown operator: {}", op),
+            _ => bail!("unknown operator: {}", op),
         }
     }
 
@@ -410,7 +410,7 @@ impl<'a> VM<'a> {
             Op::NotEqual => self.push(ObjectType::BoolObj(left != right)),
             Op::Or => self.push(ObjectType::BoolObj((left != 0.0) || (right != 0.0))),
             Op::And => self.push(ObjectType::BoolObj((left != 0.0) && (right != 0.0))),
-            _ => anyhow::bail!("Unknown operator: {}", op),
+            _ => bail!("unknown operator: {}", op),
         }
     }
 
@@ -423,15 +423,15 @@ impl<'a> VM<'a> {
                 ObjectType::IntegerObj(right) => {
                     self.execute_binary_int_operation(op, left, right)?;
                 }
-                _ => todo!(),
+                _ => bail!("unexpected operation: {} {} {}", left, op, right),
             },
             ObjectType::StringObj(left) => match right {
                 ObjectType::StringObj(right) => {
                     self.execute_string_operation(op, left, right)?;
                 }
-                _ => todo!(),
+                _ => bail!("unexpected operation: {} {} {}", left, op, right),
             },
-            _ => todo!(),
+            _ => bail!("unexpected operation: {} {} {}", left, op, right),
         }
 
         Ok(())
@@ -448,7 +448,7 @@ impl<'a> VM<'a> {
                 left.push_str(&right);
                 self.push(ObjectType::StringObj(left))
             }
-            _ => anyhow::bail!("Unsupported string operator: {}", op),
+            _ => bail!("Unsupported string operator: {}", op),
         }
     }
 
@@ -464,13 +464,13 @@ impl<'a> VM<'a> {
             Op::Mul => self.push(ObjectType::IntegerObj(left * right)),
             Op::Div => self.push(ObjectType::IntegerObj(left / right)),
 
-            _ => anyhow::bail!("Unsupported integer operator: {}", op),
+            _ => bail!("Unsupported integer operator: {}", op),
         }
     }
 
     fn push(&mut self, o: ObjectType) -> anyhow::Result<()> {
         if self.sp >= STACK_SIZE {
-            anyhow::bail!("stack overflow".to_string());
+            bail!("stack overflow".to_string());
         }
 
         self.stack[self.sp] = o;

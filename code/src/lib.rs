@@ -86,7 +86,7 @@ pub fn read_operands(op: &Op, ins: &[u8]) -> (Vec<u32>, usize) {
         match width {
             2 => operands.push(read_u16(&ins[offset..offset + 2]).into()),
             1 => operands.push(read_u8(&ins[offset..]).into()),
-            _ => todo!(),
+            _ => unreachable!("1 and 2 are the only possible widths"),
         };
 
         offset += width as usize;

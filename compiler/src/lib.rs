@@ -108,7 +108,7 @@ impl Compile for Expression {
                     Token::Not_eq => compiler.emit(&Op::NotEqual, vec![]),
                     Token::Or => compiler.emit(&Op::Or, vec![]),
                     Token::And => compiler.emit(&Op::And, vec![]),
-                    _ => todo!(),
+                    _ => return Err(CompilerError::InvalidToken(operator.clone())),
                 };
             }
             Self::PrefixExpression((operator, right)) => {
@@ -117,7 +117,7 @@ impl Compile for Expression {
                 match operator {
                     Token::Bang => compiler.emit(&Op::Bang, vec![]),
                     Token::Minus => compiler.emit(&Op::Minus, vec![]),
-                    _ => todo!(),
+                    _ => return Err(CompilerError::InvalidToken(operator.clone())),
                 };
             }
             Self::IfExpression(condition, consequence, alternative) => {
