@@ -6,15 +6,15 @@
     <link rel="stylesheet" href="./web/styles/styles.css" />
   </head>
   <body>
-    <header class="flex justify-between items-center m-6">
+    <header class="flex justify-between items-center m-6 flex-col sm:flex-row">
       <div>
         <h1 class="text-3xl font-extrabold font-sans">Monkey Playground</h1>
-        <p>
+        <p class="text-xl sm:text-base sm:max-w-[75%] lg:max-w-full">
           Enter Monkey code below. Code is compiled to bytecode and run in a VM
           with wasm.
         </p>
       </div>
-      <div class="flex h-min">
+      <div class="flex h-min mt-6 sm:mt-0">
         <div class="grid grow place-items-center">
           <p>
             <a class="link-primary" href="https://monkeylang.org/">reference</a>
@@ -32,7 +32,13 @@
     </header>
     <main class="flex flex-col mx-6 gap-8">
       <div>
-        <button id="btn" class="btn btn-primary">run</button>
+        <button id="btn" class="btn btn-primary">
+          <span
+            id="btn_loading"
+            class="hidden loading loading-spinner loading-md"
+          ></span>
+          <span id="btn_text">run</span>
+        </button>
       </div>
       <textarea id="input" autofocus class="textarea w-full h-96 font-mono">
 let main = fn() {

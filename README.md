@@ -6,11 +6,18 @@ A Rust implementation of the [Monkey language](https://monkeylang.org/)'s interp
 
 Added features:
 
+- Comments `// This is a comment`
 - Logical operators, `&&` and `||`
 - Loops, `loop` and `break`
-- Mutate variables, `let foo = 1; foo = foo + 1; foo;` // 2
+- Mutate variables:
+
+```
+let foo = 1;
+foo = foo + 1;
+foo; //2
+```
+
 - Postfix operators on variables, `foo++;` and `bar--;`
-- Comments `// This is a comment`
 
 ## Instructions
 
