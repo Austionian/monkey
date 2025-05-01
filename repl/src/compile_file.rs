@@ -1,15 +1,15 @@
-use crate::{read, start};
+use crate::start;
 use compiler::{Compiler, symbol_table::SymbolTable};
 use object::{Object, ObjectType};
 use vm::{GLOBAL_SIZE, VM};
 
-pub fn repl_compiler(
+pub fn compile(
     constants: &mut Vec<ObjectType>,
     symbol_table: SymbolTable,
     globals: &mut [ObjectType; GLOBAL_SIZE],
+    buffer: &str,
 ) -> SymbolTable {
-    let buffer = read!();
-    let program = start!(&buffer, symbol_table);
+    let program = start!(buffer, symbol_table);
 
     if let Ok(program) = program {
         let mut comp = Compiler::new(constants, symbol_table);
@@ -20,7 +20,7 @@ pub fn repl_compiler(
         let symbols = comp.symbol_table.clone();
         let mut machine = VM::new(comp, globals);
         if let Err(e) = machine.run() {
-            eprintln!("whoops! executing the bytecode failed:, {e}");
+            eprintln!("whoops! executing the bytecode failed - {e}");
         }
 
         let stack_top = machine.last_popped_stack_elem();
