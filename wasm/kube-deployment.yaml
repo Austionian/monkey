@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: monkey-playground
-          image: 10.108.202.38:5000/monkey_playground:1.0.0
+          image: 10.108.202.38:5000/monkey_playground:1.0.3
       restartPolicy: Always
 ---
 apiVersion: v1

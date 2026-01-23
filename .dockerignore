@@ -1,0 +1,7 @@
+.git/
+target/
+node_modules/
+dist/
+build/
+pkg/
+Dockerfile

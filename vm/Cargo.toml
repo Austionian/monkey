@@ -10,3 +10,6 @@ compiler = { path = "../compiler" }
 lexer = { path = "../lexer" }
 object = { path = "../object" }
 parser = { path = "../parser" }
+
+[lib]
+path = "src/lib.rs"

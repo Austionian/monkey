@@ -11,3 +11,6 @@ object = { path = "../object" }
 parser = { path = "../parser" }
 thiserror = "2.0.12"
 token = { path = "../token" }
+
+[lib]
+path = "src/lib.rs"

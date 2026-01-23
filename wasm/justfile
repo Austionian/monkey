@@ -28,8 +28,8 @@ dev:
 [private]
 build-kube:
   #!/bin/bash
-  : ${TAG=$(yq '.' version)}
-  docker build --tag registry:5001/monkey_playground:${TAG} --file Dockerfile .
+  : ${TAG=$(yq -r '.version' package.json)}
+  docker build --tag registry:5001/monkey_playground:$TAG --file Dockerfile ../
 
 # Checks if the version in `./package.json` is already the version specified in the 
 # kube-deployment file. If so, requests a new version, updates the version file
@@ -38,7 +38,7 @@ build-kube:
 check-current-version:
     #!/bin/bash
     # Get TAG from the version file if it doesn't already exist
-    : ${TAG=$(yq '.version' package.json)}
+    : ${TAG=$(yq -r '.version' package.json)}
     # Get the IMAGE specified in the kube-deployment file. (Should be what's 
     # currently deployed in the cluster.)
     IMAGE=$(
@@ -50,7 +50,7 @@ check-current-version:
     CURRENT_VERSION="${IMAGE##*:}"
 
     # Compare the what's in version to what's already deployed to the cluster.
-    if [[ $CURRENT_VERSION == "${TAG//\"/}" ]]; then
+    if [[ $CURRENT_VERSION == $TAG ]]; then
         echo ""
         echo "Current tag already deployed: $TAG"
         read -p "Enter the new version: " NEW_VERSION
@@ -69,7 +69,7 @@ check-current-version:
 [private]
 upload-kube:
     #!/bin/bash
-    : ${TAG=$(yq '.' version)}
+    : ${TAG=$(yq -r '.version' package.json)}
     set -euo pipefail
 
     # Build the image
@@ -98,7 +98,7 @@ upload-kube:
     # i.e. in the cluster itself `curl -H "Host: registry"` is required
     # Docker connects to localhost:5001 and sends Host: registry:5001.
     echo "Pushing image to registry"
-    docker push registry:5001/the_peach:$TAG
+    docker push registry:5001/monkey_playground:$TAG
 
 # Updates the cluster's image and deployment file, then applies it.
 [group('Deploy')]
@@ -107,21 +107,21 @@ deploy:
     # Upload the latest build of the image to the internal registry, then
     # update the tag in the kube config file, send it to node0, then apply it.
     # User must be in the deploygrp on node0 to be able to create files there!
-    just check-current-version
-        # && just upload-kube \
-        # && just deploy-kube
+    just check-current-version \
+        && just upload-kube \
+        && just deploy-kube
 
 # Updates the kube-deployment file, then applies it.
 [group('Deploy')]
 deploy-kube:
     #!/bin/bash
-    : ${TAG=$(yq '.' version)}
+    : ${TAG=$(yq -r '.version' package.json)}
 
     echo "Deploying $TAG"
 
     # Update the tag in the kube config file, send it to node0, then apply it.
     # User must be in the deploygrp on node0 to be able to create files there and
     # tagged image must already be in the private registry!
-    yq eval -i 'select(.metadata.name=="the-peach-software-company" and .kind=="Deployment").spec.template.spec.containers[].image = "10.108.202.38:5000/the_peach:'$TAG'"' kube-deployment.yaml \
-        && scp -P "{{PORT}}" ./kube-deployment.yaml {{HOST}}:/opt/deploys/the_peach_software_company.yaml \
-        && ssh -p "{{PORT}}" {{HOST}} "kubectl apply -f /opt/deploys/the_peach_software_company.yaml"
+    yq eval -i 'select(.metadata.name=="monkey-playground" and .kind=="Deployment").spec.template.spec.containers[].image = "10.108.202.38:5000/monkey_playground:'$TAG'"' kube-deployment.yaml \
+        && scp -P "{{PORT}}" kube-deployment.yaml {{HOST}}:/opt/deploys/monkey-playground.yaml \
+        && ssh -p "{{PORT}}" {{HOST}} "kubectl apply -f /opt/deploys/monkey-playground.yaml"

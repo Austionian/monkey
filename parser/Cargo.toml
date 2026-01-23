@@ -7,3 +7,6 @@ edition = "2024"
 ast = { path = "../ast" }
 lexer = { path = "../lexer" }
 token = { path = "../token" }
+
+[lib]
+path = "src/lib.rs"
