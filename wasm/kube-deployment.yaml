@@ -1,0 +1,68 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monkey-playground
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: monkey-playground
+  template:
+    metadata:
+      labels:
+        app: monkey-playground
+    spec:
+      containers:
+        - name: monkey-playground
+          image: 10.108.202.38:5000/monkey_playground:1.0.3
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monkey-playground
+spec:
+  selector:
+    app: monkey-playground
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monkey-playground-ingress
+  annotations:
+    # Use the issuer in the default namespace
+    cert-manager.io/issuer: "letsencrypt-prod"
+    # Rate limiting - 10 requests per second per IP
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    # Connection limiting - max 10 concurrent connections per IP
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    # Burst allowance (temporary spike allowance)
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
+    # Custom backend timeout
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # SSL redirect
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monkey.r00ks.io
+      secretName: monkey-playground-tls
+  rules:
+    - host: monkey.r00ks.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: monkey-playground
+                port:
+                  number: 80

@@ -9,3 +9,6 @@ lexer = { path = "../lexer" }
 object = { path = "../object" }
 parser = { path = "../parser" }
 token = { path = "../token" }
+
+[lib]
+path = "src/lib.rs"
